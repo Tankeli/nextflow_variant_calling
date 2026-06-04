@@ -1,0 +1,24 @@
+# Caron et al. 2020 healthy PBMMC controls (GSE132509 / SRP201012), 10x 3' v2, GEX-only.
+# Run:  nextflow run . -profile viking -params-file params-controls.yaml -resume
+#   (download FASTQ first with bin/fetch_sra_10x.sh — see jobs/)
+
+input:  assets/controls_samplesheet.csv
+outdir: results_controls
+
+# GEX-only: no Antibody Capture / feature reference
+fb_reference: null
+
+# Callers (everything, per the test plan — Numbat/souporcell are biologically uninformative on
+# healthy controls but exercise the full DAG; CopyKAT should call ~all diploid)
+run_numbat:     true
+run_copykat:    true
+run_souporcell: true
+run_qc:                true
+run_reference_mapping: true
+
+souporcell_k: '2,3'
+
+# References (absolute paths — these live in the parent scratch dir, not the project)
+cellranger_index: /mnt/scratch/users/hbp534/references/refdata-gex-GRCh38-2024-A
+souporcell_fasta: /mnt/scratch/users/hbp534/references/refdata-gex-GRCh38-2024-A/fasta/genome.fa
+refmap_atlas:     /mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/references/paediatric_bm_reference/bone_marrow_atlas.h5ad

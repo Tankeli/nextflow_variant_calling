@@ -1,0 +1,62 @@
+# Nextflow runtime
+.nextflow/
+.nextflow.log*
+work/
+
+# Pipeline outputs
+results/
+results_test/
+
+# Stray plugin report defaults (in case a config path is ever misconfigured)
+co2footprint_report_*.html
+co2footprint_summary_*.txt
+co2footprint_trace_*.txt
+execution_*.html
+execution_*.txt
+pipeline_dag_*.html
+nfprov_*.json
+
+# Input data, references, built containers (live on scratch/Longship, never git)
+data/
+data_test/
+test_data/
+references/
+refs/
+*.sif
+*.img
+logs/
+
+# Secrets — never commit
+*api_key*
+*.key
+.netrc
+credentials*
+token*
+
+# Large data file types (belt & braces)
+*.bam
+*.cram
+*.sam
+*.bai
+*.crai
+*.fastq
+*.fq
+*.fastq.gz
+*.fq.gz
+*.sra
+*.sra.tmp
+*.vcf
+*.vcf.gz
+*.bcf
+*.h5
+*.h5ad
+*.rds
+*.RDS
+*.loom
+*.mtx
+
+# OS / editor / python
+.DS_Store
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

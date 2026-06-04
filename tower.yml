@@ -1,0 +1,9 @@
+# Seqera Platform report surfacing. Paths are matched against published files under outdir;
+# these appear in the run's "Reports" tab in the Platform.
+reports:
+  "pipeline_info/execution_report_*.html":
+    display: "Nextflow execution report"
+  "pipeline_info/execution_timeline_*.html":
+    display: "Nextflow timeline"
+  "pipeline_info/co2_emissions/co2footprint_report_*.html":
+    display: "CO2 footprint report"

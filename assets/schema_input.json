@@ -1,0 +1,54 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/DDE_33/main/assets/schema_input.json",
+    "title": "DDE_33 variant-calling samplesheet",
+    "description": "Per-library rows for CITE-seq (GEX + Antibody Capture) samples; grouped by sample, with patient/timepoint for joint calling",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "sample": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "Sample name must be provided and cannot contain spaces",
+                "meta": ["id"]
+            },
+            "fastq_1": {
+                "type": "string",
+                "format": "file-path",
+                "exists": true,
+                "pattern": "^\\S+\\.f(ast)?q\\.gz$",
+                "errorMessage": "FASTQ R1 must be provided, exist, and end with .fastq.gz or .fq.gz"
+            },
+            "fastq_2": {
+                "type": "string",
+                "format": "file-path",
+                "exists": true,
+                "pattern": "^\\S+\\.f(ast)?q\\.gz$",
+                "errorMessage": "FASTQ R2 must be provided, exist, and end with .fastq.gz or .fq.gz"
+            },
+            "feature_type": {
+                "type": "string",
+                "enum": ["gex", "ab"],
+                "errorMessage": "feature_type must be 'gex' (Gene Expression) or 'ab' (Antibody Capture)"
+            },
+            "expected_cells": {
+                "type": "integer",
+                "errorMessage": "expected_cells must be an integer"
+            },
+            "patient": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "patient must be provided and cannot contain spaces",
+                "meta": ["patient"]
+            },
+            "timepoint": {
+                "type": "string",
+                "enum": ["Dx", "Rel"],
+                "errorMessage": "timepoint must be 'Dx' (diagnosis) or 'Rel' (relapse)",
+                "meta": ["timepoint"]
+            }
+        },
+        "required": ["sample", "fastq_1", "fastq_2", "feature_type", "patient", "timepoint"]
+    }
+}

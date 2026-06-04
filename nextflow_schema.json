@@ -1,0 +1,105 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/DDE_33/main/nextflow_schema.json",
+    "title": "DDE_33 variant-calling pipeline parameters",
+    "description": "Single-cell variant calling (Numbat, CopyKAT, souporcell) for paired diagnosis/relapse paediatric AML",
+    "type": "object",
+    "$defs": {
+        "input_output_options": {
+            "title": "Input/output options",
+            "type": "object",
+            "fa_icon": "fas fa-terminal",
+            "required": ["input", "outdir"],
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/csv",
+                    "pattern": "^\\S+\\.csv$",
+                    "schema": "assets/schema_input.json",
+                    "description": "Path to the samplesheet CSV (columns: sample,fastq_1,fastq_2,feature_type,expected_cells,patient,timepoint)",
+                    "fa_icon": "fas fa-file-csv"
+                },
+                "outdir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Output directory; on Viking keep this on /mnt/scratch (compute-writable, fast Lustre)",
+                    "default": "results",
+                    "fa_icon": "fas fa-folder-open"
+                }
+            }
+        },
+        "caller_options": {
+            "title": "Variant callers",
+            "type": "object",
+            "fa_icon": "fas fa-dna",
+            "properties": {
+                "run_numbat":     { "type": "boolean", "default": true,  "description": "Run Numbat (allele-based CNV / clones; primary clonal axis)" },
+                "run_copykat":    { "type": "boolean", "default": true,  "description": "Run CopyKAT (expression-based aneuploid/diploid gate)" },
+                "run_souporcell": { "type": "boolean", "default": true,  "description": "Run souporcell (SNV genotype clusters)" },
+                "numbat_joint":       { "type": "boolean", "default": true,  "description": "Pool Dx+Rel per patient (cross-timepoint comparable clone IDs)" },
+                "numbat_per_sample":  { "type": "boolean", "default": false, "description": "Additionally run Numbat per sample" },
+                "numbat_max_entropy": { "type": "number",  "default": 0.8,   "description": "Numbat max_entropy (relaxed from default 0.5)" },
+                "numbat_min_llr":     { "type": "number",  "default": 3,     "description": "Numbat min_LLR (relaxed from default 5)" },
+                "souporcell_k":       { "type": "string",  "default": "2,3,5,12", "pattern": "^[0-9]+(,[0-9]+)*$", "description": "Comma-separated K values to sweep" }
+            }
+        },
+        "annotation_options": {
+            "title": "Annotation branch (QC + reference mapping)",
+            "type": "object",
+            "fa_icon": "fas fa-tags",
+            "description": "scanpy QC + reference mapping, parallel to the callers (does not gate them)",
+            "properties": {
+                "run_qc":                { "type": "boolean", "default": true, "description": "Run scanpy/Scrublet QC per sample" },
+                "run_reference_mapping": { "type": "boolean", "default": true, "description": "Run scanpy ingest reference mapping per sample (implies QC)" },
+                "qc_min_genes":             { "type": "integer", "default": 200, "description": "Min genes/cell" },
+                "qc_min_umi":               { "type": "integer", "default": 500, "description": "Min GEX UMIs/cell" },
+                "qc_max_mito_pct":          { "type": "number",  "default": 20,  "description": "Max mitochondrial %" },
+                "qc_expected_doublet_rate": { "type": "number",  "default": 0.06, "description": "Scrublet expected doublet rate" },
+                "refmap_atlas":             { "type": "string",  "format": "file-path", "description": "Reference atlas .h5ad (default DDE_32 paediatric BM; swap in Zeng BoneMarrowMap or other)" },
+                "refmap_celltype_key":      { "type": "string",  "default": "cell_type", "description": "Atlas obs column with cell-type labels (auto-falls back to celltype/CellType/annotation)" },
+                "refmap_confidence_threshold": { "type": "number", "default": 0.5, "description": "Below this mapping confidence a cell is flagged poorly_mapped (putative blast)" },
+                "refmap_n_pcs":             { "type": "integer", "default": 30, "description": "PCs for neighbors/ingest" },
+                "scanpy_container":         { "type": "string",  "default": "scanpy-scrublet:1.11", "description": "scanpy+scrublet container (build from containers/scanpy/Dockerfile)" }
+            }
+        },
+        "reference_options": {
+            "title": "Reference data",
+            "type": "object",
+            "fa_icon": "fas fa-book",
+            "description": "Prepared once via bin/setup_numbat.sh; on Viking these can live on longship (read-only on compute is fine)",
+            "properties": {
+                "cellranger_index": { "type": "string", "format": "directory-path", "description": "Cell Ranger transcriptome reference (e.g. refdata-gex-GRCh38-2024-A)" },
+                "fb_reference":     { "type": "string", "format": "file-path", "description": "Feature reference CSV for Antibody Capture" },
+                "cellranger_container": { "type": "string", "default": "nf-core/cellranger:8.0.0", "description": "Cell Ranger container image (licensed; build/pull locally — not on biocontainers)" },
+                "numbat_snpvcf":    { "type": "string", "default": "/data/genome1K.phase3.SNP_AF5e2.chr1toX.hg38.vcf", "description": "1000G SNP VCF (hg38) inside the Numbat container" },
+                "numbat_paneldir":  { "type": "string", "default": "/data/1000G_hg38", "description": "1000G phasing panel dir (hg38) inside the Numbat container" },
+                "numbat_gmap":      { "type": "string", "default": "/Eagle_v2.4.1/tables/genetic_map_hg38_withX.txt.gz", "description": "Eagle2 genetic map (hg38) inside the Numbat container" },
+                "numbat_container": { "type": "string", "default": "docker.io/pkharchenkolab/numbat-rbase:latest", "description": "Numbat container image (ships SNP VCF / phasing panel / genetic map)" },
+                "souporcell_fasta": { "type": "string", "format": "file-path", "description": "Genome FASTA for souporcell (genome.fa)" },
+                "souporcell_container": { "type": "string", "default": "docker.io/cumulusprod/souporcell:2.5", "description": "Souporcell container image" },
+                "samtools_container":   { "type": "string", "default": "quay.io/biocontainers/samtools:1.21--h50ea8bc_0", "description": "samtools container (souporcell BAM prep)" },
+                "copykat_container":    { "type": "string", "default": "copykat:1.1.0", "description": "CopyKAT container (build from containers/copykat/Dockerfile)" }
+            }
+        },
+        "platform_options": {
+            "title": "Seqera Platform / generic",
+            "type": "object",
+            "fa_icon": "fas fa-cloud",
+            "properties": {
+                "tower_enabled":    { "type": "boolean", "default": false, "description": "Enable Seqera Platform (Tower) reporting; token via TOWER_ACCESS_TOKEN" },
+                "publish_dir_mode": { "type": "string", "default": "symlink", "enum": ["symlink", "copy", "link", "rellink", "copyNoFollow", "move"], "description": "publishDir mode (symlink avoids duplicating large outputs)" },
+                "validate_params":  { "type": "boolean", "default": true, "description": "Validate parameters against this schema" },
+                "monochrome_logs":  { "type": "boolean", "default": false, "description": "Disable coloured log output" }
+            }
+        }
+    },
+    "allOf": [
+        { "$ref": "#/$defs/input_output_options" },
+        { "$ref": "#/$defs/caller_options" },
+        { "$ref": "#/$defs/annotation_options" },
+        { "$ref": "#/$defs/reference_options" },
+        { "$ref": "#/$defs/platform_options" }
+    ]
+}

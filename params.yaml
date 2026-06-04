@@ -1,0 +1,29 @@
+# Default parameters for a real DDE_33 run.
+# Usage:  nextflow run . -profile apptainer -params-file params.yaml -resume
+# On Viking: keep outdir/work-dir on /mnt/scratch; pull references from longship.
+
+# Input / output
+input:  config/samplesheet.csv
+outdir: results
+
+# Caller toggles
+run_numbat:     true
+run_copykat:    true
+run_souporcell: true
+
+# Numbat
+numbat_joint:       true
+numbat_per_sample:  false
+numbat_max_entropy: 0.8
+numbat_min_llr:     3
+
+# Souporcell
+souporcell_k: '2,3,4,5'
+
+# References (edit to your prepared locations; see bin/setup_numbat.sh)
+cellranger_index: references/refdata-gex-GRCh38-2024-A
+fb_reference:     config/feature_reference.csv
+numbat_snpvcf:    /data/genome1K.phase3.SNP_AF5e2.chr1toX.hg38.vcf
+numbat_paneldir:  /data/1000G_hg38
+numbat_gmap:      /Eagle_v2.4.1/tables/genetic_map_hg38_withX.txt.gz
+souporcell_fasta: references/refdata-gex-GRCh38-2024-A/fasta/genome.fa
