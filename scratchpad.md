@@ -344,10 +344,21 @@ Python. Plan: `.claude/plans/ticklish-herding-wilkinson.md`.
       Python scripts run end-to-end on `results_controls/copykat/PBMMC_2` (2830 aneu/661 dip split
       matches Phase-7). Fixed: CNA-matrix barcode `.`↔`-` normalisation in drivers; invalid
       `tab:teal` colour in crossref.
-- [ ] Live: build/widen the sweep (defaults = 20 runs/sample; add distances/win.size/normref
-      deliberately — full cross-product). Run via the viking profile + `jobs/run_copykat_robustness.sh`.
-      Heavy step is the atlas-wide crossref (1.8 GB load + markers) — cached once/atlas in the sbatch
-      driver; do NOT run on the login node.
+- [x] **LIVE (controls, all 9 samples) — launched 2026-06-09:**
+      - Sweep orchestrator `jobs/run_controls_robustness.sh` (job 34565386, 40h) — viking profile,
+        `--run_copykat_robustness` with other callers off, `-work-dir work -resume` (reuses cached
+        CellRanger; only COPYKAT_SWEEP runs). Defaults = 20 combos/sample × 9 = 180 CopyKAT runs.
+        Samplesheet `assets/controls_samplesheet_all9.csv` (PBMMC_1-3 + HD_BM_1-4 + PBM_1-2).
+      - Downstream `jobs/run_copykat_robustness.sh` (job 34565441) RUNNING — drivers/crossref/celltype
+        over the existing production CopyKAT (stability skipped until the sweep publishes). Verified:
+        HD_BM_1 → 1170 aneu/386 dip, top driver ADAR.
+      - **GOTCHA fixed:** the downstream driver called `copykat_*.py` by bare name → exit 127; `bin/`
+        is only on PATH inside Nextflow tasks, so the SLURM driver now `export PATH=$PROJECT/bin:$PATH`.
+      - **Maintenance window YOR796: 2026-06-11 09:00 → 06-15 09:00** locks ~all nodes 4 days. The
+        orchestrator walltime was cut 48h→40h so it can start before the reservation; anything the
+        sweep doesn't finish before 06-11 09:00 resumes after 06-15 via `-resume`. After the sweep,
+        re-run `jobs/run_copykat_robustness.sh` for the stability/boundary outputs (cheap; atlas
+        gene-set cache + drivers already present).
 
 ## Remaining before a live run (not blockers for stub)
 - Build/push the CopyKAT image (containers/copykat/Dockerfile) and pull cellranger + numbat +

@@ -19,7 +19,10 @@
 #   ATLAS_H5AD   default = atlas from params-controls.yaml
 #   SAMPLE ...   default = every sample dir under <RESULTS_DIR>/copykat
 set -euo pipefail
-cd /mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling
+PROJECT=/mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling
+cd "${PROJECT}"
+# bin/ is only on PATH inside Nextflow tasks; add it here so the copykat_*.py scripts are callable.
+export PATH="${PROJECT}/bin:${PATH}"
 
 module load Miniconda3/23.5.2-0
 source activate aml_scrna
