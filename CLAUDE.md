@@ -37,8 +37,12 @@ souporcell so clone IDs are comparable across timepoints — per-sample clone ID
 - **Boundaries**: FASTQ → variant checkpoints + a parallel cell-annotation branch. Cell Ranger is
   wrapped upstream; the multi-modal integration (Phase-0 master table, Sankeys) stays in DDE_32.
 - **Callers included**: Numbat (CNV, primary clonal axis), CopyKAT (expression-based aneuploidy
-  gate), souporcell (SNV genotype clusters). **mgatk is intentionally excluded** (deselected; also
-  had silent failures on Sample_3001 in DDE_32).
+  gate), souporcell (SNV genotype clusters), and **CloneTracer** (veltenlab) as a *downstream*
+  Bayesian clonal-integration branch — it is not a de-novo caller; it consumes per-cell M/N counts
+  derived from the callers (Numbat CNVs + souporcell SNVs + a new mtDNA pileup) and emits clone
+  trees + per-cell clone posteriors. **mgatk is not a standalone stage** (deselected; silent
+  failures on Sample_3001 in DDE_32) but is wired as the *opt-in* mtDNA method for CloneTracer
+  (`clonetracer_mtdna_method=mgatk`); the default mtDNA path is cellsnp-lite.
 - **Annotation branch (Python/scanpy)**: scanpy/Scrublet QC + reference mapping (`scanpy.tl.ingest`)
   run *parallel* to the callers off the raw cellranger matrices — they do NOT gate caller inputs.
   Ported from the DDE_23 scanpy stack (the user prefers Python over the DDE_32 R/Seurat scripts).
@@ -63,11 +67,16 @@ Each stage is resumable with a stable output contract under `results/`:
 3. **COPYKAT** (per-sample) → `results/copykat/<sample>/*_copykat_prediction.txt`.
 4. **SOUPORCELL** (optional noNK barcode subset → per-patient CB-retag + merge + sort →
    `souporcell_pipeline.py` over a K sweep) → `results/souporcell/<patient>/k<K>/clusters.tsv`.
-5. **ANNOTATION (parallel branch)** — `SCANPY_QC` (per sample) → `results/qc/<sample>/<sample>_qc.h5ad`
+5. **CLONETRACER** (downstream, joint per patient) → `MTDNA_PILEUP` (per sample, cellsnp-lite on
+   chrM; mgatk opt-in) + `CLONETRACER_BUILD` (synthesise per-cell M/N over CNV/SNV/mtDNA →
+   `<patient>.json`) + `CLONETRACER` (`run_clonetracer.py`, pyro) →
+   `results/clonetracer/<patient>/<patient>_clone_assignments.csv` + `_out.pickle` + `_tree.pickle`.
+   Gated by `run_clonetracer`; uses whatever caller sources are available (mtDNA alone suffices).
+6. **ANNOTATION (parallel branch)** — `SCANPY_QC` (per sample) → `results/qc/<sample>/<sample>_qc.h5ad`
    + `_qc_metrics.csv`; then `REFERENCE_MAPPING` (per sample, ingest onto the atlas) →
    `results/reference_mapping/<sample>/<sample>_celltypes.csv` + `_mapped.h5ad`. Gated by
    `run_qc` / `run_reference_mapping` (reference mapping implies QC).
-6. **Provenance**: `results/pipeline_info/` — nf-prov BCO/legacy manifests + co2footprint
+7. **Provenance**: `results/pipeline_info/` — nf-prov BCO/legacy manifests + co2footprint
    trace/report/summary + Nextflow execution report/timeline.
 
 ## Containers / environments
@@ -188,8 +197,13 @@ the sanctioned login-node exception alongside longship staging.
   `*_allele_counts.tsv.gz`, VCFs as `.vcf.gz`. Avoid publishing uncompressed `.tsv`/`.vcf`.
 - **Archival to longship**: **zstd** (`-T0 -8`) for `*.bam/*.cram/*.fastq/*.vcf` and a single
   `work.tar.zst`, as `../snapshot_dde_to_longship.sh` already does.
-- In Nextflow, prefer `publishDir` `mode: 'symlink'` (default here) so results aren't duplicated;
-  compress the actual files in the process, not via a copy.
+- In Nextflow, `publishDir` uses `mode: 'link'` (hardlink) here: results are real files that
+  survive a `work/` cleanup with no duplication (work/ and results/ share scratch Lustre). Do NOT
+  use `'symlink'` — deleting `work/` then destroys the published results. Use `'copy'` only when
+  results must live on a different filesystem from `work/`. Compress in the process, not via a copy.
+- **Never `rm -rf work` in the project root** while a run's results matter — even with hardlinks the
+  `-resume` cache lives in `work/` + `.nextflow/`. Run stub/test validations with an isolated
+  `-work-dir work_stub` and a throwaway `--outdir`.
 
 ## Conventions / gotchas
 
@@ -203,3 +217,19 @@ the sanctioned login-node exception alongside longship staging.
   gzipped (`barcodes.tsv.gz`) so decompress before passing.
 - Prefer BAM but fall back to CRAM (`possorted_genome_bam.cram`) — the original scripts all handle
   this; preserve it.
+
+## Lab book
+
+Lab book lives in `docs/lab_book/`: dated worklogs in `sessions/YYYY-MM-DD_slug.md`, distilled
+findings in `analyses/NN_slug.md`, index in `docs/lab_book/README.md`. Full standard + templates:
+`../_workspace_admin/LAB_BOOK_STANDARD.md`. `scratchpad.md` is the live build tracker; the lab book
+records what happened (runs, results, decisions).
+
+When asked to log work, write/update an entry to that standard:
+- Use the matching template; keep frontmatter present and `status` accurate.
+- No bare claims — every result is a number or an artifact path (job counts, walltime, file paths).
+- Commands in fenced ```bash blocks with real flags; Slurm jobs record id · resources · efficiency.
+- Tool versions + links; paths repo-relative or absolute; raw/irreplaceable data → Longship path.
+- Connect entries with `[[wikilinks]]`; record `branch@commit` (+ container/env) when code ran.
+- Session = append a worklog; Analysis = distil + link the sessions that produced it.
+- Update `docs/lab_book/README.md` when adding an entry.

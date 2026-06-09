@@ -9,7 +9,10 @@
             "title": "Input/output options",
             "type": "object",
             "fa_icon": "fas fa-terminal",
-            "required": ["input", "outdir"],
+            "required": [
+                "input",
+                "outdir"
+            ],
             "properties": {
                 "input": {
                     "type": "string",
@@ -35,14 +38,117 @@
             "type": "object",
             "fa_icon": "fas fa-dna",
             "properties": {
-                "run_numbat":     { "type": "boolean", "default": true,  "description": "Run Numbat (allele-based CNV / clones; primary clonal axis)" },
-                "run_copykat":    { "type": "boolean", "default": true,  "description": "Run CopyKAT (expression-based aneuploid/diploid gate)" },
-                "run_souporcell": { "type": "boolean", "default": true,  "description": "Run souporcell (SNV genotype clusters)" },
-                "numbat_joint":       { "type": "boolean", "default": true,  "description": "Pool Dx+Rel per patient (cross-timepoint comparable clone IDs)" },
-                "numbat_per_sample":  { "type": "boolean", "default": false, "description": "Additionally run Numbat per sample" },
-                "numbat_max_entropy": { "type": "number",  "default": 0.8,   "description": "Numbat max_entropy (relaxed from default 0.5)" },
-                "numbat_min_llr":     { "type": "number",  "default": 3,     "description": "Numbat min_LLR (relaxed from default 5)" },
-                "souporcell_k":       { "type": "string",  "default": "2,3,5,12", "pattern": "^[0-9]+(,[0-9]+)*$", "description": "Comma-separated K values to sweep" }
+                "run_numbat": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Run Numbat (allele-based CNV / clones; primary clonal axis)"
+                },
+                "run_copykat": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Run CopyKAT (expression-based aneuploid/diploid gate)"
+                },
+                "run_souporcell": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Run souporcell (SNV genotype clusters)"
+                },
+                "run_clonetracer": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Run CloneTracer downstream Bayesian clonal integration (Numbat CNV + souporcell SNV + mtDNA pileup)."
+                },
+                "numbat_joint": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Pool Dx+Rel per patient (cross-timepoint comparable clone IDs)"
+                },
+                "numbat_per_sample": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Additionally run Numbat per sample"
+                },
+                "numbat_max_entropy": {
+                    "type": "number",
+                    "default": 0.8,
+                    "description": "Numbat max_entropy (relaxed from default 0.5)"
+                },
+                "numbat_min_llr": {
+                    "type": "number",
+                    "default": 3,
+                    "description": "Numbat min_LLR (relaxed from default 5)"
+                },
+                "souporcell_k": {
+                    "type": "string",
+                    "default": "2,3,5,12",
+                    "pattern": "^[0-9]+(,[0-9]+)*$",
+                    "description": "Comma-separated K values to sweep"
+                },
+                "souporcell_plot_k": {
+                    "type": "integer",
+                    "default": 3,
+                    "description": "K used for the per-patient souporcell clone overlay figure + Phase-0 integration (must be one of souporcell_k)"
+                },
+                "run_integration": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Phase 2: per-patient master table + headline Dx\u2192Rel clonal-tracing Sankeys (needs all callers + reference mapping)"
+                }
+            }
+        },
+        "copykat_robustness_options": {
+            "title": "CopyKAT robustness analysis",
+            "type": "object",
+            "fa_icon": "fas fa-vial",
+            "description": "Separate track (off by default): CopyKAT parameter x seed sweep to test where the aneuploid/diploid boundary lies and how stable the call is. Requires run_copykat.",
+            "properties": {
+                "run_copykat_robustness": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Run the CopyKAT robustness sweep (separate analysis track; downstream Python via jobs/run_copykat_robustness.sh)"
+                },
+                "copykat_robustness_ks_cut": {
+                    "type": "array",
+                    "items": { "type": "number" },
+                    "default": [0.05, 0.1, 0.15, 0.2],
+                    "description": "KS.cut values to sweep (segmentation/classification stringency)"
+                },
+                "copykat_robustness_win_size": {
+                    "type": "array",
+                    "items": { "type": "integer" },
+                    "default": [25],
+                    "description": "win.size values to sweep (segmentation window in genes)"
+                },
+                "copykat_robustness_ngene_chr": {
+                    "type": "array",
+                    "items": { "type": "integer" },
+                    "default": [5],
+                    "description": "ngene.chr values to sweep (min genes per chromosome)"
+                },
+                "copykat_robustness_distance": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "default": ["euclidean"],
+                    "description": "Distance metrics to sweep (euclidean / spearman / pearson)"
+                },
+                "copykat_robustness_use_norm_ref": {
+                    "type": "array",
+                    "items": { "type": "boolean" },
+                    "default": [false],
+                    "description": "Run with vs without a known-normal baseline ([true,false] to test both); true requires run_reference_mapping"
+                },
+                "copykat_robustness_seeds": {
+                    "type": "array",
+                    "items": { "type": "integer" },
+                    "default": [1, 2, 3, 4, 5],
+                    "description": "Random seeds (replicates) for per-cell call stability"
+                },
+                "copykat_norm_celltypes": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "default": ["T", "NK", "CTL"],
+                    "description": "ref_cell_type labels treated as a confidently-diploid baseline (norm.cell.names) when use_norm_ref=true"
+                }
             }
         },
         "annotation_options": {
@@ -51,17 +157,65 @@
             "fa_icon": "fas fa-tags",
             "description": "scanpy QC + reference mapping, parallel to the callers (does not gate them)",
             "properties": {
-                "run_qc":                { "type": "boolean", "default": true, "description": "Run scanpy/Scrublet QC per sample" },
-                "run_reference_mapping": { "type": "boolean", "default": true, "description": "Run scanpy ingest reference mapping per sample (implies QC)" },
-                "qc_min_genes":             { "type": "integer", "default": 200, "description": "Min genes/cell" },
-                "qc_min_umi":               { "type": "integer", "default": 500, "description": "Min GEX UMIs/cell" },
-                "qc_max_mito_pct":          { "type": "number",  "default": 20,  "description": "Max mitochondrial %" },
-                "qc_expected_doublet_rate": { "type": "number",  "default": 0.06, "description": "Scrublet expected doublet rate" },
-                "refmap_atlas":             { "type": "string",  "format": "file-path", "description": "Reference atlas .h5ad (default DDE_32 paediatric BM; swap in Zeng BoneMarrowMap or other)" },
-                "refmap_celltype_key":      { "type": "string",  "default": "cell_type", "description": "Atlas obs column with cell-type labels (auto-falls back to celltype/CellType/annotation)" },
-                "refmap_confidence_threshold": { "type": "number", "default": 0.5, "description": "Below this mapping confidence a cell is flagged poorly_mapped (putative blast)" },
-                "refmap_n_pcs":             { "type": "integer", "default": 30, "description": "PCs for neighbors/ingest" },
-                "scanpy_container":         { "type": "string",  "default": "scanpy-scrublet:1.11", "description": "scanpy+scrublet container (build from containers/scanpy/Dockerfile)" }
+                "run_qc": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Run scanpy/Scrublet QC per sample"
+                },
+                "run_reference_mapping": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Run scanpy ingest reference mapping per sample (implies QC)"
+                },
+                "qc_min_genes": {
+                    "type": "integer",
+                    "default": 200,
+                    "description": "Min genes/cell"
+                },
+                "qc_min_umi": {
+                    "type": "integer",
+                    "default": 500,
+                    "description": "Min GEX UMIs/cell"
+                },
+                "qc_max_mito_pct": {
+                    "type": "number",
+                    "default": 20,
+                    "description": "Max mitochondrial %"
+                },
+                "qc_expected_doublet_rate": {
+                    "type": "number",
+                    "default": 0.06,
+                    "description": "Scrublet expected doublet rate"
+                },
+                "refmap_atlas": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Reference atlas .h5ad (default DDE_32 paediatric BM; swap in Zeng BoneMarrowMap or other)"
+                },
+                "refmap_umap": {
+                    "type": "string",
+                    "description": "Frozen atlas UMAP tsv (cell, UMAP_1, UMAP_2) = the shared reference-map space all samples project into; null computes per-run"
+                },
+                "refmap_celltype_key": {
+                    "type": "string",
+                    "default": "cell_type",
+                    "description": "Atlas obs column with cell-type labels (auto-falls back to celltype/CellType/annotation)"
+                },
+                "refmap_confidence_threshold": {
+                    "type": "number",
+                    "default": 0.5,
+                    "description": "Below this mapping confidence a cell is flagged poorly_mapped (putative blast)"
+                },
+                "refmap_n_pcs": {
+                    "type": "integer",
+                    "default": 30,
+                    "description": "PCs for neighbors/ingest"
+                },
+                "scanpy_container": {
+                    "type": "string",
+                    "default": "scanpy-scrublet:1.11",
+                    "description": "scanpy+scrublet container (build from containers/scanpy/Dockerfile)"
+                }
             }
         },
         "reference_options": {
@@ -70,17 +224,61 @@
             "fa_icon": "fas fa-book",
             "description": "Prepared once via bin/setup_numbat.sh; on Viking these can live on longship (read-only on compute is fine)",
             "properties": {
-                "cellranger_index": { "type": "string", "format": "directory-path", "description": "Cell Ranger transcriptome reference (e.g. refdata-gex-GRCh38-2024-A)" },
-                "fb_reference":     { "type": "string", "format": "file-path", "description": "Feature reference CSV for Antibody Capture" },
-                "cellranger_container": { "type": "string", "default": "nf-core/cellranger:8.0.0", "description": "Cell Ranger container image (licensed; build/pull locally — not on biocontainers)" },
-                "numbat_snpvcf":    { "type": "string", "default": "/data/genome1K.phase3.SNP_AF5e2.chr1toX.hg38.vcf", "description": "1000G SNP VCF (hg38) inside the Numbat container" },
-                "numbat_paneldir":  { "type": "string", "default": "/data/1000G_hg38", "description": "1000G phasing panel dir (hg38) inside the Numbat container" },
-                "numbat_gmap":      { "type": "string", "default": "/Eagle_v2.4.1/tables/genetic_map_hg38_withX.txt.gz", "description": "Eagle2 genetic map (hg38) inside the Numbat container" },
-                "numbat_container": { "type": "string", "default": "docker.io/pkharchenkolab/numbat-rbase:latest", "description": "Numbat container image (ships SNP VCF / phasing panel / genetic map)" },
-                "souporcell_fasta": { "type": "string", "format": "file-path", "description": "Genome FASTA for souporcell (genome.fa)" },
-                "souporcell_container": { "type": "string", "default": "docker.io/cumulusprod/souporcell:2.5", "description": "Souporcell container image" },
-                "samtools_container":   { "type": "string", "default": "quay.io/biocontainers/samtools:1.21--h50ea8bc_0", "description": "samtools container (souporcell BAM prep)" },
-                "copykat_container":    { "type": "string", "default": "copykat:1.1.0", "description": "CopyKAT container (build from containers/copykat/Dockerfile)" }
+                "cellranger_index": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Cell Ranger transcriptome reference (e.g. refdata-gex-GRCh38-2024-A)"
+                },
+                "fb_reference": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Feature reference CSV for Antibody Capture"
+                },
+                "cellranger_container": {
+                    "type": "string",
+                    "default": "nf-core/cellranger:8.0.0",
+                    "description": "Cell Ranger container image (licensed; build/pull locally \u2014 not on biocontainers)"
+                },
+                "numbat_snpvcf": {
+                    "type": "string",
+                    "default": "/data/genome1K.phase3.SNP_AF5e2.chr1toX.hg38.vcf",
+                    "description": "1000G SNP VCF (hg38) inside the Numbat container"
+                },
+                "numbat_paneldir": {
+                    "type": "string",
+                    "default": "/data/1000G_hg38",
+                    "description": "1000G phasing panel dir (hg38) inside the Numbat container"
+                },
+                "numbat_gmap": {
+                    "type": "string",
+                    "default": "/Eagle_v2.4.1/tables/genetic_map_hg38_withX.txt.gz",
+                    "description": "Eagle2 genetic map (hg38) inside the Numbat container"
+                },
+                "numbat_container": {
+                    "type": "string",
+                    "default": "docker.io/pkharchenkolab/numbat-rbase:latest",
+                    "description": "Numbat container image (ships SNP VCF / phasing panel / genetic map)"
+                },
+                "souporcell_fasta": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Genome FASTA for souporcell (genome.fa)"
+                },
+                "souporcell_container": {
+                    "type": "string",
+                    "default": "docker.io/cumulusprod/souporcell:2.5",
+                    "description": "Souporcell container image"
+                },
+                "samtools_container": {
+                    "type": "string",
+                    "default": "quay.io/biocontainers/samtools:1.21--h50ea8bc_0",
+                    "description": "samtools container (souporcell BAM prep)"
+                },
+                "copykat_container": {
+                    "type": "string",
+                    "default": "copykat:1.1.0",
+                    "description": "CopyKAT container (build from containers/copykat/Dockerfile)"
+                }
             }
         },
         "platform_options": {
@@ -88,18 +286,134 @@
             "type": "object",
             "fa_icon": "fas fa-cloud",
             "properties": {
-                "tower_enabled":    { "type": "boolean", "default": false, "description": "Enable Seqera Platform (Tower) reporting; token via TOWER_ACCESS_TOKEN" },
-                "publish_dir_mode": { "type": "string", "default": "symlink", "enum": ["symlink", "copy", "link", "rellink", "copyNoFollow", "move"], "description": "publishDir mode (symlink avoids duplicating large outputs)" },
-                "validate_params":  { "type": "boolean", "default": true, "description": "Validate parameters against this schema" },
-                "monochrome_logs":  { "type": "boolean", "default": false, "description": "Disable coloured log output" }
+                "tower_enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable Seqera Platform (Tower) reporting; token via TOWER_ACCESS_TOKEN"
+                },
+                "publish_dir_mode": {
+                    "type": "string",
+                    "default": "symlink",
+                    "enum": [
+                        "symlink",
+                        "copy",
+                        "link",
+                        "rellink",
+                        "copyNoFollow",
+                        "move"
+                    ],
+                    "description": "publishDir mode (symlink avoids duplicating large outputs)"
+                },
+                "validate_params": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Validate parameters against this schema"
+                },
+                "monochrome_logs": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Disable coloured log output"
+                }
+            }
+        },
+        "clonetracer_options": {
+            "title": "CloneTracer options",
+            "type": "object",
+            "description": "CloneTracer (veltenlab) downstream clonal integration: synthesises per-cell M/N over CNV/nuclear-SNV/mtDNA and infers clone trees + per-cell clone posteriors.",
+            "properties": {
+                "clonetracer_k": {
+                    "type": "integer",
+                    "default": 3,
+                    "description": "Which souporcell K's genotypes feed the nuclear-SNV axis."
+                },
+                "clonetracer_iterations": {
+                    "type": "integer",
+                    "default": 0,
+                    "description": "SVI iterations; 0 = auto (300 SNV-only / 500 when CNVs present). If set, use >=100 (values 1-99 fall back to auto since the model uses init = iterations - 100)."
+                },
+                "clonetracer_gpu": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Use a GPU for inference (-g). Recommended by upstream but needs a GPU partition."
+                },
+                "clonetracer_pseudobulk": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Synthesise per-timepoint bulk_M/bulk_N (pseudobulk) to enable the multi-sample model (-s). Without it (and lacking exome/karyotype data) CloneTracer runs pooled across timepoints."
+                },
+                "clonetracer_gtf": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Gene GTF used to map genes to chromosome arms for CNV pseudo-counts (default: cellranger reference GTF)."
+                },
+                "clonetracer_max_snvs": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Cap on nuclear-SNV sites taken from souporcell."
+                },
+                "clonetracer_mtdna_method": {
+                    "type": "string",
+                    "default": "cellsnp",
+                    "enum": [
+                        "cellsnp",
+                        "mgatk"
+                    ],
+                    "description": "mtDNA caller: cellsnp-lite (default) or mgatk (opt-in)."
+                },
+                "clonetracer_mtdna_chrom": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Mitochondrial contig name; empty = auto-detect from the BAM (fallback chrM)."
+                },
+                "clonetracer_mtdna_min_maf": {
+                    "type": "number",
+                    "default": 0.01,
+                    "description": "cellsnp-lite --minMAF for mtDNA pileup."
+                },
+                "clonetracer_mtdna_min_count": {
+                    "type": "integer",
+                    "default": 20,
+                    "description": "cellsnp-lite --minCOUNT for mtDNA pileup."
+                },
+                "clonetracer_mtdna_min_cells": {
+                    "type": "integer",
+                    "default": 10,
+                    "description": "Keep mtDNA sites covered in at least this many cells."
+                },
+                "clonetracer_mtdna_max_sites": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Cap on mtDNA sites."
+                },
+                "clonetracer_container": {
+                    "type": "string",
+                    "default": "clonetracer:1.0",
+                    "description": "CloneTracer container image (build from containers/clonetracer/Dockerfile)."
+                }
             }
         }
     },
     "allOf": [
-        { "$ref": "#/$defs/input_output_options" },
-        { "$ref": "#/$defs/caller_options" },
-        { "$ref": "#/$defs/annotation_options" },
-        { "$ref": "#/$defs/reference_options" },
-        { "$ref": "#/$defs/platform_options" }
+        {
+            "$ref": "#/$defs/input_output_options"
+        },
+        {
+            "$ref": "#/$defs/caller_options"
+        },
+        {
+            "$ref": "#/$defs/clonetracer_options"
+        },
+        {
+            "$ref": "#/$defs/copykat_robustness_options"
+        },
+        {
+            "$ref": "#/$defs/annotation_options"
+        },
+        {
+            "$ref": "#/$defs/reference_options"
+        },
+        {
+            "$ref": "#/$defs/platform_options"
+        }
     ]
 }

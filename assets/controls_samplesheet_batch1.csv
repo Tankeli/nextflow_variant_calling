@@ -1,0 +1,4 @@
+sample,fastq_1,fastq_2,feature_type,expected_cells,patient,timepoint
+PBMMC_1,data/controls/PBMMC_1/PBMMC_1_S1_L001_R1_001.fastq.gz,data/controls/PBMMC_1/PBMMC_1_S1_L001_R2_001.fastq.gz,gex,5000,PBMMC_1,Dx
+PBMMC_2,data/controls/PBMMC_2/PBMMC_2_S1_L001_R1_001.fastq.gz,data/controls/PBMMC_2/PBMMC_2_S1_L001_R2_001.fastq.gz,gex,5000,PBMMC_2,Dx
+PBMMC_3,data/controls/PBMMC_3/PBMMC_3_S1_L001_R1_001.fastq.gz,data/controls/PBMMC_3/PBMMC_3_S1_L001_R2_001.fastq.gz,gex,5000,PBMMC_3,Dx

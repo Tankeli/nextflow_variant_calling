@@ -13,4 +13,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
         scrublet \
         leidenalg \
         igraph \
-        numpy scipy pandas h5py anndata
+        numpy scipy pandas h5py anndata \
+        matplotlib \
+        plotly kaleido

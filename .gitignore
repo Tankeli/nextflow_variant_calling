@@ -2,10 +2,20 @@
 .nextflow/
 .nextflow.log*
 work/
+work_*/
 
-# Pipeline outputs
+# Pipeline outputs (all run-specific result dirs)
 results/
-results_test/
+results_*/
+
+# Per-run launch staging + scratch run dirs
+.launch_*/
+test_clonetracer_gpu/
+
+# SLURM / orchestrator scratch
+gpu_smoke_*
+*.jobid
+slurm-*.out
 
 # Stray plugin report defaults (in case a config path is ever misconfigured)
 co2footprint_report_*.html
@@ -25,6 +35,11 @@ refs/
 *.sif
 *.img
 logs/
+
+# Clinical / biobank patient metadata — never commit (data governance)
+assets/Paed_AML_Vivobank_details.csv
+*Vivobank*
+*_details.csv
 
 # Secrets — never commit
 *api_key*

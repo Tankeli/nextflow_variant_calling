@@ -14,6 +14,7 @@ process SCANPY_QC {
     output:
     tuple val(meta), path("${meta.id}_qc.h5ad"), emit: h5ad
     path "${meta.id}_qc_metrics.csv"           , emit: metrics
+    path "${meta.id}_qc_panel.{png,pdf}"       , emit: panel
     path "versions.yml"                        , emit: versions
 
     script:
@@ -31,6 +32,8 @@ process SCANPY_QC {
     """
     printf 'barcode,sample_id,n_genes,pass_qc\\nAAAA-1,${meta.id},1500,True\\n' > ${meta.id}_qc_metrics.csv
     echo stub > ${meta.id}_qc.h5ad
+    echo stub > ${meta.id}_qc_panel.png
+    echo stub > ${meta.id}_qc_panel.pdf
     echo '"${task.process}": {scanpy: stub}' > versions.yml
     """
 }

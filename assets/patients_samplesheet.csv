@@ -1,0 +1,9 @@
+sample,fastq_1,fastq_2,feature_type,expected_cells,patient,timepoint
+Sample_2395,/mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/data/GEX/GEX-2395_S1_L001_R1_001.fastq.gz,/mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/data/GEX/GEX-2395_S1_L001_R2_001.fastq.gz,gex,5000,Patient_1,Dx
+Sample_2395,/mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/data/CSP/CSP-2395_S1_L001_R1_001.fastq.gz,/mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/data/CSP/CSP-2395_S1_L001_R2_001.fastq.gz,ab,5000,Patient_1,Dx
+Sample_3001,/mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/data/GEX/GEX-3001_S1_L001_R1_001.fastq.gz,/mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/data/GEX/GEX-3001_S1_L001_R2_001.fastq.gz,gex,5000,Patient_1,Rel
+Sample_3001,/mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/data/CSP/CSP-3001_S1_L001_R1_001.fastq.gz,/mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/data/CSP/CSP-3001_S1_L001_R2_001.fastq.gz,ab,5000,Patient_1,Rel
+Sample_2977,/mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/data/GEX/GEX-2977_S1_L001_R1_001.fastq.gz,/mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/data/GEX/GEX-2977_S1_L001_R2_001.fastq.gz,gex,5000,Patient_2,Dx
+Sample_2977,/mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/data/CSP/CSP-2977_S1_L001_R1_001.fastq.gz,/mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/data/CSP/CSP-2977_S1_L001_R2_001.fastq.gz,ab,5000,Patient_2,Dx
+Sample_0109,/mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/data/GEX/GEX-0109_S1_L001_R1_001.fastq.gz,/mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/data/GEX/GEX-0109_S1_L001_R2_001.fastq.gz,gex,5000,Patient_2,Rel
+Sample_0109,/mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/data/CSP/CSP-0109_S1_L001_R1_001.fastq.gz,/mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/data/CSP/CSP-0109_S1_L001_R2_001.fastq.gz,ab,5000,Patient_2,Rel

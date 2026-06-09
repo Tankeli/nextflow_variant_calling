@@ -1,0 +1,10 @@
+sample,fastq_1,fastq_2,feature_type,expected_cells,patient,timepoint
+PBMMC_1,data/controls/PBMMC_1/PBMMC_1_S1_L001_R1_001.fastq.gz,data/controls/PBMMC_1/PBMMC_1_S1_L001_R2_001.fastq.gz,gex,5000,PBMMC_1,Dx
+PBMMC_2,data/controls/PBMMC_2/PBMMC_2_S1_L001_R1_001.fastq.gz,data/controls/PBMMC_2/PBMMC_2_S1_L001_R2_001.fastq.gz,gex,5000,PBMMC_2,Dx
+PBMMC_3,data/controls/PBMMC_3/PBMMC_3_S1_L001_R1_001.fastq.gz,data/controls/PBMMC_3/PBMMC_3_S1_L001_R2_001.fastq.gz,gex,5000,PBMMC_3,Dx
+HD_BM_1,data/controls/HD_BM_1/HD_BM_1_S1_L001_R1_001.fastq.gz,data/controls/HD_BM_1/HD_BM_1_S1_L001_R2_001.fastq.gz,gex,5000,HD_BM_1,Dx
+HD_BM_2,data/controls/HD_BM_2/HD_BM_2_S1_L001_R1_001.fastq.gz,data/controls/HD_BM_2/HD_BM_2_S1_L001_R2_001.fastq.gz,gex,5000,HD_BM_2,Dx
+HD_BM_3,data/controls/HD_BM_3/HD_BM_3_S1_L001_R1_001.fastq.gz,data/controls/HD_BM_3/HD_BM_3_S1_L001_R2_001.fastq.gz,gex,5000,HD_BM_3,Dx
+HD_BM_4,data/controls/HD_BM_4/HD_BM_4_S1_L001_R1_001.fastq.gz,data/controls/HD_BM_4/HD_BM_4_S1_L001_R2_001.fastq.gz,gex,5000,HD_BM_4,Dx
+PBM_1,data/controls/PBM_1/PBM_1_S1_L001_R1_001.fastq.gz,data/controls/PBM_1/PBM_1_S1_L001_R2_001.fastq.gz,gex,5000,PBM_1,Dx
+PBM_2,data/controls/PBM_2/PBM_2_S1_L001_R1_001.fastq.gz,data/controls/PBM_2/PBM_2_S1_L001_R2_001.fastq.gz,gex,5000,PBM_2,Dx

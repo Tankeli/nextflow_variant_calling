@@ -11,16 +11,21 @@ process REFERENCE_MAPPING {
     input:
     tuple val(meta), path(qc_h5ad)
     path atlas
+    path refmap_umap
 
     output:
     tuple val(meta), path("${meta.id}_celltypes.csv"), emit: celltypes
-    path "${meta.id}_mapped.h5ad"                    , emit: mapped
+    tuple val(meta), path("${meta.id}_mapped.h5ad")  , emit: mapped
+    path "${meta.id}_mapping_umap.{png,pdf}"         , emit: umap
     path "versions.yml"                              , emit: versions
 
     script:
+    def umap_arg = refmap_umap ? refmap_umap : 'NONE'
     """
+    # v2: reference now log-normalised to match the query before PCA/ingest (raw-count atlas fix)
     reference_mapping.py ${qc_h5ad} ${atlas} ${meta.id} \\
-        ${params.refmap_celltype_key} ${params.refmap_confidence_threshold} ${params.refmap_n_pcs}
+        ${params.refmap_celltype_key} ${params.refmap_confidence_threshold} ${params.refmap_n_pcs} \\
+        ${umap_arg}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -32,6 +37,8 @@ process REFERENCE_MAPPING {
     """
     printf 'barcode,sample_id,ref_cell_type,mapping_confidence,poorly_mapped\\nAAAA-1,${meta.id},HSC,0.9,False\\n' > ${meta.id}_celltypes.csv
     echo stub > ${meta.id}_mapped.h5ad
+    echo stub > ${meta.id}_mapping_umap.png
+    echo stub > ${meta.id}_mapping_umap.pdf
     echo '"${task.process}": {scanpy: stub}' > versions.yml
     """
 }

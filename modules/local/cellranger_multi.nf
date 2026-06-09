@@ -25,12 +25,14 @@ process CELLRANGER_MULTI {
     script:
     def lib_lines = libraries.collect { lib ->
         def ft = lib.feature_type == 'gex' ? 'Gene Expression' : 'Antibody Capture'
-        "${lib.fastq_id},fastqs,${ft}"
+        // cellranger requires an ABSOLUTE fastqs path
+        "${lib.fastq_id},\${fastqs_dir},${ft}"
     }.join('\n')
     def expect = meta.expected_cells ? "expect-cells,${meta.expected_cells}" : ''
     // GEX-only when no feature/antibody reference is supplied
     def feature_section = fb_reference ? "\n[feature]\nreference,\$(readlink -f ${fb_reference})\n" : ''
     """
+    fastqs_dir=\$(readlink -f fastqs)
     cat > multi_config.csv <<EOF
 [gene-expression]
 reference,\$(readlink -f ${cellranger_index})

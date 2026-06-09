@@ -8,8 +8,15 @@ include { INPUT_CHECK   } from '../subworkflows/local/input_check'
 include { CELLRANGER    } from '../subworkflows/local/cellranger'
 include { NUMBAT        } from '../subworkflows/local/numbat'
 include { COPYKAT_WF    } from '../subworkflows/local/copykat'
+include { COPYKAT_ROBUSTNESS_WF } from '../subworkflows/local/copykat_robustness'
 include { SOUPORCELL_WF } from '../subworkflows/local/souporcell'
+include { CLONETRACER_WF } from '../subworkflows/local/clonetracer'
 include { ANNOTATION    } from '../subworkflows/local/annotation'
+include { PLOT_COPYKAT    } from '../modules/local/plot_copykat'
+include { PLOT_SOUPORCELL } from '../modules/local/plot_souporcell'
+include { PLOT_CLONETRACER } from '../modules/local/plot_clonetracer'
+include { COHORT_SUMMARY  } from '../modules/local/cohort_summary'
+include { INTEGRATION     } from '../subworkflows/local/integration'
 
 workflow VARIANTCALLING {
 
@@ -69,24 +76,135 @@ workflow VARIANTCALLING {
     }
 
     //
+    // CloneTracer (downstream clonal integration), joint per patient. Synthesises per-cell M/N
+    // over CNV (Numbat) + nuclear-SNV (souporcell) + a new per-sample mtDNA pileup, builds the
+    // per-patient JSON and runs the Bayesian model -> clone trees + per-cell clone posteriors.
+    //
+    ch_clonetracer = Channel.empty()
+    if (params.run_clonetracer) {
+        // GTF is optional: it only powers the CNV pseudo-counts. If absent, CloneTracer simply
+        // builds its JSON from the SNV + mtDNA axes (build script logs the skipped source).
+        def ct_gtf = []
+        if (params.clonetracer_gtf) {
+            def gtf_f = file(params.clonetracer_gtf)
+            if (gtf_f.exists()) { ct_gtf = gtf_f }
+            else { log.warn "clonetracer_gtf not found (${params.clonetracer_gtf}); CloneTracer CNV axis disabled" }
+        }
+        CLONETRACER_WF( ch_aln, ch_patient_aln, ch_numbat, ch_souporcell, ct_gtf )
+        ch_clonetracer = CLONETRACER_WF.out.assignments
+        ch_versions    = ch_versions.mix(CLONETRACER_WF.out.versions)
+    }
+
+    //
     // Annotation branch (scanpy QC -> reference mapping), parallel to the callers
     //
     ch_qc = Channel.empty()
     ch_celltypes = Channel.empty()
+    ch_mapped = Channel.empty()
     if (params.run_qc || params.run_reference_mapping) {
         def atlas = params.run_reference_mapping ? file(params.refmap_atlas, checkIfExists: true) : []
-        ANNOTATION( ch_aln, params.run_reference_mapping, atlas )
+        def refumap = (params.run_reference_mapping && params.refmap_umap) ? file(params.refmap_umap, checkIfExists: true) : []
+        ANNOTATION( ch_aln, params.run_reference_mapping, atlas, refumap )
         ch_qc        = ANNOTATION.out.qc
         ch_celltypes = ANNOTATION.out.celltypes
+        ch_mapped    = ANNOTATION.out.mapped
         ch_versions  = ch_versions.mix(ANNOTATION.out.versions)
+    }
+
+    //
+    // CopyKAT robustness sweep (separate analysis track; standalone Python runs downstream over the
+    // published combos via jobs/run_copykat_robustness.sh). Needs the cellranger matrices + the
+    // reference-mapped cell types (for the optional known-normal baseline arm).
+    //
+    if (params.run_copykat_robustness) {
+        if (!params.run_copykat) {
+            error "run_copykat_robustness requires run_copykat"
+        }
+        if (params.copykat_robustness_use_norm_ref.any { it as boolean } && !params.run_reference_mapping) {
+            error "copykat_robustness_use_norm_ref=true requires run_reference_mapping (for the normal baseline)"
+        }
+        ch_ck_mtx = ch_aln.map { meta, bam, bai, mtx -> tuple( meta, mtx ) }
+        COPYKAT_ROBUSTNESS_WF( ch_ck_mtx, ch_celltypes )
+        ch_versions = ch_versions.mix(COPYKAT_ROBUSTNESS_WF.out.versions)
+    }
+
+    //
+    // Visualisation — diagnostic figures over the published checkpoints. Each reads an
+    // existing output in the relevant container; the reference-space overlays need the
+    // mapped h5ads, so they are gated on run_reference_mapping.
+    //
+    if (params.run_reference_mapping && params.run_copykat) {
+        // Per-sample CopyKAT call overlaid on the reference-map UMAP (join by sample id).
+        ch_ck_plot = ch_mapped
+            .map { meta, h5ad -> tuple( meta.id, meta, h5ad ) }
+            .join( ch_copykat.map { meta, pred -> tuple( meta.id, pred ) } )
+            .map { id, meta, h5ad, pred -> tuple( meta, h5ad, pred ) }
+        PLOT_COPYKAT( ch_ck_plot )
+        ch_versions = ch_versions.mix(PLOT_COPYKAT.out.versions)
+    }
+
+    if (params.run_reference_mapping && params.run_souporcell) {
+        // Per-patient souporcell clones on a joint reference-space UMAP (Dx/Rel or standalone).
+        ch_mapped_by_patient = ch_mapped
+            .map { meta, h5ad -> tuple( meta.patient, h5ad ) }
+            .groupTuple()
+        ch_soup_plot = SOUPORCELL_WF.out.clusters
+            .filter { meta, k, dir -> k == params.souporcell_plot_k }
+            .map { meta, k, dir -> tuple( meta.id, meta, k, dir ) }
+            .join( ch_mapped_by_patient )
+            .map { pid, meta, k, dir, h5ads -> tuple( meta, k, dir, h5ads ) }
+        PLOT_SOUPORCELL( ch_soup_plot )
+        ch_versions = ch_versions.mix(PLOT_SOUPORCELL.out.versions)
+    }
+
+    if (params.run_reference_mapping && params.run_clonetracer) {
+        // Per-patient CloneTracer clones + posterior confidence on the joint reference-space UMAP.
+        ch_ct_mapped_by_patient = ch_mapped
+            .map { meta, h5ad -> tuple( meta.patient, h5ad ) }
+            .groupTuple()
+        ch_ct_plot = ch_clonetracer
+            .map { meta, csv -> tuple( meta.id, meta, csv ) }
+            .join( ch_ct_mapped_by_patient )
+            .map { pid, meta, csv, h5ads -> tuple( meta, csv, h5ads ) }
+        PLOT_CLONETRACER( ch_ct_plot )
+        ch_versions = ch_versions.mix(PLOT_CLONETRACER.out.versions)
+    }
+
+    if (params.run_qc || params.run_reference_mapping) {
+        // Cohort-level QC summary across all samples.
+        COHORT_SUMMARY( ch_qc.collect() )
+        ch_versions = ch_versions.mix(COHORT_SUMMARY.out.versions)
+    }
+
+    //
+    // Integration (Phase 2): per-patient master table + headline clonal-tracing Sankeys.
+    // Needs the joint clone axes (Numbat + souporcell) plus the reference-mapped phenotype layers.
+    //
+    ch_cells = Channel.empty()
+    if (params.run_integration) {
+        if (!(params.run_numbat && params.run_souporcell && params.run_reference_mapping && params.run_copykat)) {
+            error "run_integration requires run_numbat, run_souporcell, run_copykat and run_reference_mapping"
+        }
+        INTEGRATION(
+            ch_mapped,
+            ch_celltypes,
+            ch_copykat,
+            ch_numbat,
+            ch_souporcell,
+            params.souporcell_plot_k
+        )
+        ch_cells    = INTEGRATION.out.cells
+        ch_versions = ch_versions.mix(INTEGRATION.out.versions)
     }
 
     emit:
     aln         = ch_aln
+    cells       = ch_cells
     patient_aln = ch_patient_aln
     numbat      = ch_numbat
     copykat     = ch_copykat
     souporcell  = ch_souporcell
+    clonetracer = ch_clonetracer
     qc          = ch_qc
     celltypes   = ch_celltypes
     versions    = ch_versions

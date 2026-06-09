@@ -218,14 +218,136 @@ Accessions: PBMMC_1=SRR9264351, PBMMC_2=SRR9264353, PBMMC_3=SRR9264354 (GSM38724
 - [x] `assets/controls_samplesheet.csv` (3 samples, gex, each its own patient, timepoint=Dx) +
       `params-controls.yaml` (absolute ref paths; atlas = DDE_32 paediatric BM h5ad; souporcell_k=2,3).
 - [x] Submitted SRA download SLURM job **34329477** (logs/sra_pbmmc_*.log; writes data/controls/).
-- [ ] **NEXT (after download):** `nextflow run . -profile viking -params-file params-controls.yaml -resume`
-      inside a SLURM alloc. First confirm fastqs landed + read-length classification was right
-      (v2: R1=26bp, R2=98bp).
+- [x] Read-length classification confirmed correct (I1=8, R1=26, R2=98). PBMMC_1 + PBMMC_2 FASTQs
+      complete; PBMMC_3 still downloading.
+- [x] **LIVE RUN STARTED (batch1 = PBMMC_1,2):** orchestrator sbatch `jobs/run_controls.sh`
+      (job 34341569, node036) → `nextflow run . -profile viking -params-file params-controls.yaml
+      --input assets/controls_samplesheet_batch1.csv -work-dir work -resume`. CELLRANGER_MULTI for
+      PBMMC_1/PBMMC_2 RUNNING (jobs 34341670/34341672). outdir=results_controls.
+- [ ] When PBMMC_3 download finishes: resubmit `sbatch jobs/run_controls.sh
+      assets/controls_samplesheet.csv` (all 3) — `-resume` reuses PBMMC_1/2 cellranger work.
+- [ ] Watch first downstream steps (scanpy QC via aml_scrna conda, numbat.sif pileup, souporcell.sif)
+      for viking-profile issues (module/conda activation, apptainer bind mounts) — first real exercise.
+
+Config tidy-ups: removed deprecated nf-prov `legacy` format; set co2footprint
+`machineType = 'compute cluster'`.
+
+**✅ BATCH1 COMPLETE (PBMMC_1, PBMMC_2) — full DAG ran end-to-end (exit 0, 12 succeeded + 6 cached,
+3h36m).** Every stage produced outputs under `results_controls/`:
+- CellRanger ✅ (possorted_genome_bam.bam ~19.6GB + filtered matrix, both samples)
+- SCANPY_QC ✅ (qc.h5ad + qc_metrics.csv) — aml_scrna conda branch works
+- REFERENCE_MAPPING ✅ (celltypes.csv + mapped.h5ad; PBMMC_1 ~CLP/T/DC — plausible PBMMC)
+- COPYKAT ✅ (prediction.txt both)
+- NUMBAT pileup ✅ (allele_counts.tsv.gz both); run_numbat: PBMMC_1 "No CNV remains after LLR
+  filtering" → no clones (correct for healthy); PBMMC_2 called clones ("All done!")
+- SOUPORCELL ✅ (clusters.tsv + cluster_genotypes.vcf per K)
+
+Biological caveats (tool behavior, NOT pipeline bugs): CopyKAT over-calls aneuploidy on PBMMC_2
+(2828 aneu / 663 dip) and Numbat called clones on PBMMC_2 — expected when healthy controls lack a
+matched-normal baseline + relaxed thresholds (min_LLR=3). PBMMC_1 behaves as expected (mostly
+diploid, no clones). This is exactly the value of a healthy-control run.
+
+TWO PRODUCTION TODOs surfaced:
+1. Add `procps` to numbat.sif (apptainer overlay or rebuild) so we can RE-ENABLE trace/report/
+   timeline/dag + co2footprint (currently disabled in the viking profile to dodge the ps requirement).
+2. CopyKAT/Numbat on healthy controls: consider supplying a normal reference / stricter thresholds
+   if using controls as a true baseline (see DDE_32 notebook 08 healthy-ref work).
+
+**BUG FIXED (1st live run):** CellRanger preflight rejected the relative fastqs path
+("Specified FASTQ folder must be an absolute path: fastqs"). Fixed CELLRANGER_MULTI to write an
+absolute `[libraries]` fastqs path (`fastqs_dir=$(readlink -f fastqs)`). Resubmitted (job 34347849
+→ cellranger 34347864/34347866): preflight + chemistry auto-detect (v2) + barcode-compat now pass;
+both samples counting. (Reference resolves through the /references symlink to the DDE_21 copy —
+valid/complete.)
 
 > RISK: SRA prefetch needs outbound internet on the compute node — if Viking compute nodes block it,
 > run prefetch on a login/transfer node and fasterq-dump on compute. Watch job 34329477.
 > Numbat/souporcell are single-sample per control (each control = its own "patient"); joint logic
 > degrades to per-sample, which is fine mechanically.
+
+### Phase 8 — CloneTracer (downstream clonal integration) — IN PROGRESS
+Added the veltenlab CloneTracer Bayesian model as a **downstream integration branch** (not a
+de-novo caller). It consumes per-cell mutant (M) / reference (N) counts over a curated mutation set
+and emits clone trees + per-cell clone posteriors. Standard CITE-seq only, so M/N are synthesised
+in-pipeline; joint Dx+Rel per patient (`-s` / `class_assign` = timepoint). Gated `run_clonetracer`.
+
+M/N derivation (joint `<sample>__<barcode>` namespace; union of cells, zero-filled, M=N=0 = no info):
+- **CNV (mut_type 0)** ← Numbat `segs_consensus_*.tsv` (gain/loss arms) + per-sample expression
+  matrix summed over the affected arm (M) vs total UMIs (N); `r_cnv` 1.5 gain / 0.5 loss. Gene→arm
+  via the cellranger reference GTF (`clonetracer_gtf`).
+- **nuclear SNV (mut_type 1)** ← souporcell `k<K>/{alt,ref}.mtx` at GT-differential sites from
+  `cluster_genotypes.vcf` (cap `clonetracer_max_snvs`). Low coverage inherent to 3' 10x — documented.
+- **mtDNA SNV (mut_type 2)** ← new `MTDNA_PILEUP` (per sample). Method-switchable
+  `clonetracer_mtdna_method`: **cellsnp-lite (default, in numbat.sif)** or **mgatk (opt-in,
+  normalised to cellSNP files via `bin/mgatk_to_cellsnp.py`)**.
+
+- [x] Vendored `bin/run_clonetracer.py` + `bin/helper_functions.py` (helper imported via
+      `PYTHONPATH=$projectDir/bin`) + `envs/clonetracer.yml`.
+- [x] `bin/clonetracer_build_json.py` (M/N → `<patient>.json`); `bin/clonetracer_assignments.py`
+      (pickle → tidy `*_clone_assignments.csv`, best tree by lowest final ELBO);
+      `bin/mgatk_to_cellsnp.py`.
+- [x] Modules `mtdna_pileup.nf`, `clonetracer_build.nf`, `clonetracer.nf` (+stubs); subworkflow
+      `clonetracer.nf` (`CLONETRACER_WF`) — optional Numbat/souporcell via `remainder:true` joins.
+- [x] Wired into `workflows/variantcalling.nf` after souporcell; params + `clonetracer_options`
+      schema group; publishDir `results/clonetracer/<patient>/`; `conf/viking.config`
+      (CLONETRACER_BUILD→aml_scrna, CLONETRACER→`clonetracer` conda env, MTDNA_PILEUP→numbat.sif);
+      `containers/clonetracer/Dockerfile`.
+- [ ] Live: create the `clonetracer` conda env on the login node
+      (`conda env create -f envs/clonetracer.yml -n clonetracer`), confirm mtDNA contig name for
+      GRCh38-2024-A (auto-detect fallback chrM), then re-run controls with `--run_clonetracer`.
+- [ ] Confirm cellsnp-lite + samtools are on PATH inside numbat.sif (idxstats auto-detect, pileup).
+
+> **GOTCHA found in testing (vendored model):**
+> - `run_clonetracer.py` upstream has **no shebang** and uses `matplotlib` interactively — added
+>   `#!/usr/bin/env python3` + `matplotlib.use("Agg")` (only change to the vendored file) so it runs
+>   headless via `bin/` on PATH.
+> - **`-s` (multiple_samples) requires `bulk_M`/`bulk_N`** in the JSON, else `select_tree` does
+>   `af_alpha[:,muts]` on the 1-D zero bulk vector → `IndexError`. We have no exome/karyotype, so the
+>   default does **not** pass `-s`: clones are still joint across Dx+Rel (all cells share one M/N
+>   matrix). Opt-in `--clonetracer_pseudobulk` synthesises per-timepoint bulk column-sums to enable
+>   `-s`. Verified: with `-s`+no bulk → IndexError; without `-s` → proceeds.
+> - **Runtime / WRONG ENV:** the pre-existing `clonetracer` conda env on Viking is **pyro 1.9.1 /
+>   torch 2.11** (NOT the pinned 1.8.4/1.13 in `envs/clonetracer.yml`) and is *pathologically* slow —
+>   ~15 s per SVI iteration even for an 8-cell / 2-SNV toy model, so a 100-iter run times out at 25 min
+>   and never writes a pickle. Inference itself is correct (the `-t 60` run reached the post-inference
+>   `print_elbo` diagnostic), so this is purely a perf wall from the env version drift.
+>   **ACTION before the live run:** recreate the env from the pinned yml
+>   (`conda env create -f envs/clonetracer.yml -n clonetracer`, on the login node) or build
+>   `containers/clonetracer/Dockerfile` (pins 1.8.4/1.13); and/or use `--clonetracer_gpu` on a GPU
+>   partition. Did NOT capture a full end-to-end pickle locally because of this env (out of scope to
+>   rebuild the heavy env here). Everything upstream of the model (JSON build, mtDNA pileup, assignment
+>   parsing, stub DAG, schema/config) is verified.
+
+### Phase 9 — CopyKAT robustness/reliability analysis (separate track) — IN PROGRESS
+Quantify how trustworthy CopyKAT calls are on healthy + patient samples (prompted by PBMMC_2
+over-calling aneuploidy in Phase 7). **Hybrid**: a gated Nextflow sweep subworkflow + standalone
+Python. Plan: `.claude/plans/ticklish-herding-wilkinson.md`.
+- [x] `bin/copykat_sweep.R` — generalised `copykat.R` with `set.seed()` + KS.cut/win.size/ngene.chr/
+      distance/norm.cell.names; output named by combo id.
+- [x] `modules/local/copykat_sweep.nf` + `copykat_norm_barcodes.nf` (known-normal baseline from
+      ref_cell_type ∈ `copykat_norm_celltypes`); `subworkflows/local/copykat_robustness.nf`
+      (`COPYKAT_ROBUSTNESS_WF`, cross-product fan-out; `combine(by:0)` fans the per-sample norm file
+      across combos; placeholder `assets/no_norm_barcodes.txt` for the norm=0 arm).
+- [x] Standalone Python (`bin/`): `copykat_stability.py` (consensus + seed switch-rate + ARI +
+      boundary curve + UMAP overlay), `copykat_drivers.py` (gene/region drivers, aneuploid-vs-diploid
+      |Δ| + variance), `copykat_crossref.py` (drivers vs atlas-PCA anchor genes + rank_genes_groups
+      markers + pLSC6/LSC17; hypergeometric + Jaccard; **atlas gene sets cached to JSON**, marker
+      method arg, default wilcoxon), `copykat_celltype_matrix.py` (cell type × chrom mean/variance +
+      aneuploid fraction per type).
+- [x] `jobs/run_copykat_robustness.sh` (aml_scrna conda; CKROB_MARKER_METHOD override).
+- [x] Wired: `nextflow.config` params (`run_copykat_robustness` + sweep grids, off by default),
+      `nextflow_schema.json` (`copykat_robustness_options`), `conf/modules.config` publishDir,
+      `conf/viking.config` (SWEEP→snv, NORM_BARCODES→aml_scrna), `workflows/variantcalling.nf`
+      (gated, errors early if normref arm without reference mapping).
+- [x] Validated: stub DAG `-profile test -stub --run_copykat_robustness` exit 0 (COPYKAT_SWEEP 80=4
+      samples×20 combos; normref arm fans NORM_BARCODES + 4 combos/sample; guard errors fire). All 4
+      Python scripts run end-to-end on `results_controls/copykat/PBMMC_2` (2830 aneu/661 dip split
+      matches Phase-7). Fixed: CNA-matrix barcode `.`↔`-` normalisation in drivers; invalid
+      `tab:teal` colour in crossref.
+- [ ] Live: build/widen the sweep (defaults = 20 runs/sample; add distances/win.size/normref
+      deliberately — full cross-product). Run via the viking profile + `jobs/run_copykat_robustness.sh`.
+      Heavy step is the atlas-wide crossref (1.8 GB load + markers) — cached once/atlas in the sbatch
+      driver; do NOT run on the login node.
 
 ## Remaining before a live run (not blockers for stub)
 - Build/push the CopyKAT image (containers/copykat/Dockerfile) and pull cellranger + numbat +
@@ -243,7 +365,9 @@ Accessions: PBMMC_1=SRR9264351, PBMMC_2=SRR9264353, PBMMC_3=SRR9264354 (GSM38724
 - Souporcell K: single K or sweep range as a param? (DDE_24 swept k2–20; default to a list param).
 
 ## Done-but-verify
-- mgatk excluded by decision — do not add.
+- mgatk: was excluded as a standalone caller; now wired only as an **opt-in** mtDNA method for
+  CloneTracer (`clonetracer_mtdna_method=mgatk`). Default mtDNA path is cellsnp-lite. Not a
+  standalone variant-calling stage.
 - NK filtering excluded for now — souporcell runs on full BAMs; do not port the DDE_24 noNK step.
 - Lossless compression integrated throughout: emit CRAM over BAM where tools allow (pass ref FASTA),
   bgzip+tabix text/VCF outputs, zstd for longship archival. No uncompressed genomic files published.

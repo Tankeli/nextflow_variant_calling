@@ -11,6 +11,7 @@ workflow ANNOTATION {
     ch_aln           // [ meta, bam, bai, matrix_dir ]
     run_refmap       // bool
     atlas            // path (only used when run_refmap)
+    refmap_umap      // path | [] — frozen reference UMAP for the shared map space
 
     main:
     ch_versions = Channel.empty()
@@ -19,14 +20,17 @@ workflow ANNOTATION {
     ch_versions = ch_versions.mix(SCANPY_QC.out.versions)
 
     ch_celltypes = Channel.empty()
+    ch_mapped    = Channel.empty()
     if (run_refmap) {
-        REFERENCE_MAPPING( SCANPY_QC.out.h5ad, atlas )
+        REFERENCE_MAPPING( SCANPY_QC.out.h5ad, atlas, refmap_umap )
         ch_celltypes = REFERENCE_MAPPING.out.celltypes
+        ch_mapped    = REFERENCE_MAPPING.out.mapped
         ch_versions  = ch_versions.mix(REFERENCE_MAPPING.out.versions)
     }
 
     emit:
     qc        = SCANPY_QC.out.metrics
     celltypes = ch_celltypes
+    mapped    = ch_mapped
     versions  = ch_versions
 }

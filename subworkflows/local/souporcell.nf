@@ -14,7 +14,9 @@ workflow SOUPORCELL_WF {
     ch_versions = Channel.empty()
 
     ch_prep_in = ch_patient_aln.map { patient, members ->
-        def meta = [ id: patient, samples: members.collect { it.meta.id } ]
+        def meta = [ id: patient,
+                     samples:    members.collect { it.meta.id },
+                     timepoints: members.collect { it.meta.timepoint } ]
         tuple( meta,
                members.collect { it.bam },
                members.collect { it.bai },

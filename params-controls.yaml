@@ -15,6 +15,11 @@ run_copykat:    true
 run_souporcell: true
 run_qc:                true
 run_reference_mapping: true
+# CloneTracer off for healthy controls: uninformative here, and its default GTF path isn't wired
+# for this run. Re-enable (with an absolute clonetracer_gtf) if you want it exercised on controls.
+run_clonetracer: false
+# Phase 2 integration / headline Sankeys: off for healthy controls (no malignant clones to trace).
+run_integration: false
 
 souporcell_k: '2,3'
 
@@ -22,3 +27,6 @@ souporcell_k: '2,3'
 cellranger_index: /mnt/scratch/users/hbp534/references/refdata-gex-GRCh38-2024-A
 souporcell_fasta: /mnt/scratch/users/hbp534/references/refdata-gex-GRCh38-2024-A/fasta/genome.fa
 refmap_atlas:     /mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/references/paediatric_bm_reference/bone_marrow_atlas.h5ad
+# Frozen seed-123 atlas UMAP = the shared reference-map space all overlay figures project into
+refmap_umap:      /mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/references/paediatric_bm_reference/bone_marrow_atlas_umap_seed123.tsv
+souporcell_plot_k: 3

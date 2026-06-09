@@ -1,0 +1,35 @@
+# DDE_32 prototype AML cohort (paired Dx/Rel), run through DDE_33 to validate the full pipeline
+# including the Phase-2 integration + headline Sankeys on real malignant data.
+#   Patient_1: Sample_2395 (Dx) + Sample_3001 (Rel)
+#   Patient_2: Sample_2977 (Dx) + Sample_0109 (Rel)
+# Run via jobs/run_patients.sh (isolated launch dir + work_patients, so it can run alongside the
+# controls run without sharing work/.nextflow).
+
+input:  /mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling/assets/patients_samplesheet.csv
+outdir: /mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling/results_patients
+
+# CITE-seq (GEX + Antibody Capture) -> feature reference needed for the ab rows
+fb_reference: /mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/config/feature_reference.csv
+
+# Full caller set + annotation
+run_numbat:            true
+run_copykat:           true
+run_souporcell:        true
+run_qc:                true
+run_reference_mapping: true
+
+# Phase 2: per-patient master table + headline Dx->Rel clonal-tracing Sankeys (the point of this run)
+run_integration: true
+
+# CloneTracer off: its default gene GTF is not present at the references path here, and it is the
+# in-progress parallel branch. Enable with an absolute clonetracer_gtf to exercise it too.
+run_clonetracer: false
+
+souporcell_k:      '2,3,5,12'
+souporcell_plot_k: 3
+
+# References (absolute — shared scratch refs + the DDE_32 paediatric BM atlas / frozen UMAP)
+cellranger_index: /mnt/scratch/users/hbp534/references/refdata-gex-GRCh38-2024-A
+souporcell_fasta: /mnt/scratch/users/hbp534/references/refdata-gex-GRCh38-2024-A/fasta/genome.fa
+refmap_atlas:     /mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/references/paediatric_bm_reference/bone_marrow_atlas.h5ad
+refmap_umap:      /mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/references/paediatric_bm_reference/bone_marrow_atlas_umap_seed123.tsv

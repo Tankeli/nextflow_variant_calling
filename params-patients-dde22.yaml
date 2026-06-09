@@ -1,0 +1,46 @@
+# Extended paediatric AML cohort (Vivobank batch) sourced from DDE_22, run through DDE_33.
+# Cohort mapping derived from assets/Paed_AML_Vivobank_details.csv (alias = patient):
+#   Paired (Dx+Rel -> joint Numbat/souporcell):
+#     AML225: Sample_0984 + Sample_0984-B (Dx) + Sample_4230 (Rel)
+#     AML107: Sample_8178 (Dx) + Sample_1894 (Rel)
+#     AML066: Sample_3652 (Dx) + Sample_1386 (Rel)   # CSV typo 3562 -> FASTQ 3652
+#     AML079: Sample_2765 (Dx) + Sample_1255 (Rel)
+#   Standalone (single-timepoint, paired == NA or partner FASTQ absent):
+#     AML065: Sample_5807 + Sample_5807-B (Dx)
+#     AML155: Sample_2958 (Dx)
+#     AML161: Sample_1199 (Dx)
+#     AML124: Sample_3280 (Dx)
+#     AML163: Sample_1187 (Dx)
+#     AML104: Sample_8087 (Rel only; Dx 2243 has no FASTQ in DDE_22)
+# FASTQs are Cell Ranger-compliant symlinks under assets/fastq_dde22/ pointing at
+# DDE_22_clean_nextflow_basic_pipeline/data/{GEX,CSP}.
+# Run via jobs/run_patients_dde22.sh (own launchDir + work_patients_dde22, runs alongside the
+# original patients run without sharing work/.nextflow).
+
+input:  /mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling/assets/patients_dde22_samplesheet.csv
+outdir: /mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling/results_patients_dde22
+
+# CITE-seq (GEX + Antibody Capture) -> DDE_22's own feature reference (same panel as DDE_32)
+fb_reference: /mnt/scratch/users/hbp534/DDE_22_clean_nextflow_basic_pipeline/config/feature_reference.csv
+
+# Full caller set + annotation
+run_numbat:            true
+run_copykat:           true
+run_souporcell:        true
+run_qc:                true
+run_reference_mapping: true
+
+# Phase 2: per-patient master table + headline Dx->Rel clonal-tracing Sankeys
+run_integration: true
+
+# CloneTracer off (default GTF not present at refs path; in-progress branch)
+run_clonetracer: false
+
+souporcell_k:      '2,3,5,12'
+souporcell_plot_k: 3
+
+# References (absolute — shared scratch refs + the DDE_32 paediatric BM atlas / frozen UMAP)
+cellranger_index: /mnt/scratch/users/hbp534/references/refdata-gex-GRCh38-2024-A
+souporcell_fasta: /mnt/scratch/users/hbp534/references/refdata-gex-GRCh38-2024-A/fasta/genome.fa
+refmap_atlas:     /mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/references/paediatric_bm_reference/bone_marrow_atlas.h5ad
+refmap_umap:      /mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/references/paediatric_bm_reference/bone_marrow_atlas_umap_seed123.tsv
