@@ -2,9 +2,9 @@
 date: 2026-06-04
 project: DDE_33
 type: session
-status: in-progress
+status: done
 tags: [first-run, caron-controls, viking-profile, cellranger, full-dag]
-related: ["[[01_pipeline_build_and_validation]]"]
+related: ["[[01_pipeline_build_and_validation]]", "[[2026-06-08_controls-full-cohort]]", "[[02_copykat_robustness]]"]
 ---
 
 # 2026-06-04 — First real run: Caron 2020 healthy PBMMC controls
