@@ -28,7 +28,7 @@ process CLONETRACER {
     // pass -t when >=100, otherwise let it auto-pick (300 SNV-only / 500 with CNVs).
     def iters = (params.clonetracer_iterations as int) >= 100 ? "-t ${params.clonetracer_iterations}" : ''
     """
-    export PYTHONPATH="${projectDir}/bin:\$PYTHONPATH"
+    export PYTHONPATH="${projectDir}/bin:\${PYTHONPATH:-}"
 
     run_clonetracer.py \\
         -i ${json} \\

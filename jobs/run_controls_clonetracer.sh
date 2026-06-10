@@ -36,6 +36,7 @@ nextflow run . \
     --clonetracer_gpu \
     --clonetracer_gtf "${GTF}" \
     --clonetracer_mtdna_chrom chrM \
+    -c conf/maint_cap.config \
     -plugins nf-schema@2.7.2,nf-prov@1.7.0 \
     -work-dir work \
     -resume
