@@ -12,6 +12,10 @@ include { COPYKAT_ROBUSTNESS_WF } from '../subworkflows/local/copykat_robustness
 include { SOUPORCELL_WF } from '../subworkflows/local/souporcell'
 include { CLONETRACER_WF } from '../subworkflows/local/clonetracer'
 include { ANNOTATION    } from '../subworkflows/local/annotation'
+include { RNA_CORE        } from '../subworkflows/local/rna_core'
+include { RNA_INTEGRATION } from '../subworkflows/local/rna_integration'
+include { RNA_ADVANCED    } from '../subworkflows/local/rna_advanced'
+include { PROTEIN         } from '../subworkflows/local/protein'
 include { PLOT_COPYKAT    } from '../modules/local/plot_copykat'
 include { PLOT_SOUPORCELL } from '../modules/local/plot_souporcell'
 include { PLOT_CLONETRACER } from '../modules/local/plot_clonetracer'
@@ -109,6 +113,69 @@ workflow VARIANTCALLING {
         ch_celltypes = ANNOTATION.out.celltypes
         ch_mapped    = ANNOTATION.out.mapped
         ch_versions  = ch_versions.mix(ANNOTATION.out.versions)
+    }
+
+    //
+    // RNA downstream best-practices stack (ported from DDE_27), parallel to the callers and to
+    // the lightweight ANNOTATION branch. Runs off the Cell Ranger filtered matrices:
+    //   RNA_CORE        QC -> normalize -> feature-select -> dimred -> cluster -> annotate (per sample)
+    //   RNA_INTEGRATION cohort integration (scVI / scANVI / BBKNN + scib)            [needs run_rna_core]
+    //   RNA_ADVANCED    pseudotime / velocity / DE / composition (gated individually)[needs run_rna_core]
+    //   PROTEIN         surface-protein / ADT branch (CITE-seq only)
+    // All default OFF; enable per run. None of these gate the variant callers.
+    //
+    ch_rna_mtx = ch_aln.map { meta, bam, bai, mtx -> tuple( meta, mtx ) }
+
+    ch_rna_annotated = Channel.empty()
+    if (params.run_rna_core) {
+        RNA_CORE( ch_rna_mtx )
+        ch_rna_annotated = RNA_CORE.out.annotated
+        ch_versions      = ch_versions.mix(RNA_CORE.out.versions)
+    }
+
+    ch_rna_integrated = Channel.empty()
+    if (params.run_rna_integration) {
+        if (!params.run_rna_core) {
+            error "run_rna_integration requires run_rna_core (it consumes the annotated objects)"
+        }
+        RNA_INTEGRATION( ch_rna_annotated )
+        ch_rna_integrated = RNA_INTEGRATION.out.integrated
+        ch_versions       = ch_versions.mix(RNA_INTEGRATION.out.versions)
+    }
+
+    if (params.run_pseudotime || params.run_velocity || params.run_de || params.run_composition) {
+        if (!params.run_rna_core) {
+            error "RNA advanced stages (pseudotime/velocity/de/composition) require run_rna_core"
+        }
+        if (params.run_composition && !params.run_rna_integration) {
+            error "run_composition requires run_rna_integration (it operates on the integrated object)"
+        }
+        // Velocity looms (optional): ${params.velocity_loom_dir}/<sample>.loom; samples without
+        // one are dropped by the join in RNA_ADVANCED.
+        ch_loom = Channel.empty()
+        if (params.run_velocity) {
+            if (!params.velocity_loom_dir) {
+                error "run_velocity requires velocity_loom_dir (this pipeline does not generate velocyto looms)"
+            }
+            ch_loom = ch_rna_mtx
+                .map { meta, mtx -> tuple( meta.id, file("${params.velocity_loom_dir}/${meta.id}.loom") ) }
+                .filter { id, loom -> loom.exists() }
+        }
+        RNA_ADVANCED(
+            ch_rna_annotated,
+            ch_loom,
+            ch_rna_integrated,
+            params.run_pseudotime,
+            params.run_velocity,
+            params.run_de,
+            params.run_composition
+        )
+        ch_versions = ch_versions.mix(RNA_ADVANCED.out.versions)
+    }
+
+    if (params.run_protein) {
+        PROTEIN( ch_rna_mtx )
+        ch_versions = ch_versions.mix(PROTEIN.out.versions)
     }
 
     //

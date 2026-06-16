@@ -1,0 +1,16 @@
+name: surface-protein
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - scanpy>=1.10
+  - muon>=0.1.5
+  - mudata
+  - harmonypy
+  - matplotlib-base
+  - seaborn
+  - scipy
+  - numba
+  - leidenalg
+  - pooch

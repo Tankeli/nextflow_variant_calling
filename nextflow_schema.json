@@ -391,6 +391,193 @@
                     "description": "CloneTracer container image (build from containers/clonetracer/Dockerfile)."
                 }
             }
+        },
+        "rna_downstream_options": {
+            "title": "RNA downstream best-practices stack (ported from DDE_27)",
+            "type": "object",
+            "description": "Scanpy/muon downstream analysis run parallel to the variant callers off the Cell Ranger matrices: RNA core (QC->normalize->feature-select->dimred->cluster->annotate), cohort integration, advanced (pseudotime/velocity/DE/composition) and a surface-protein/ADT branch. All OFF by default.",
+            "properties": {
+                "run_rna_core": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "RNA core per sample: QC -> normalize -> feature-select -> dimred -> cluster -> annotate."
+                },
+                "run_rna_integration": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Multi-sample cohort integration (scVI/scANVI/BBKNN + scib). Requires run_rna_core."
+                },
+                "run_pseudotime": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Diffusion pseudotime (per sample). Requires run_rna_core."
+                },
+                "run_velocity": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "RNA velocity (per sample; needs a velocyto loom via velocity_loom_dir). Requires run_rna_core."
+                },
+                "run_de": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Differential expression per patient (Dx vs Rel). Requires run_rna_core."
+                },
+                "run_composition": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Compositional analysis on the integrated cohort object. Requires run_rna_integration."
+                },
+                "run_protein": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Surface-protein / ADT branch (CITE-seq samples only; GEX-only samples have no 'prot' modality)."
+                },
+                "rna_qc_nmads_counts": {
+                    "type": "integer",
+                    "default": 5,
+                    "description": "MADs for log1p_total_counts / n_genes / pct_top_20 outlier detection."
+                },
+                "rna_qc_nmads_mt": {
+                    "type": "integer",
+                    "default": 3,
+                    "description": "MADs for pct_counts_mt outlier detection."
+                },
+                "rna_qc_max_mito_pct": {
+                    "type": "number",
+                    "default": 8,
+                    "description": "Hard mitochondrial percentage ceiling."
+                },
+                "rna_qc_min_cells": {
+                    "type": "integer",
+                    "default": 20,
+                    "description": "Drop genes expressed in fewer than this many cells."
+                },
+                "run_scdblfinder": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "scDblFinder doublet scoring (annotated, not removed)."
+                },
+                "n_top_genes": {
+                    "type": "integer",
+                    "default": 4000,
+                    "description": "Deviance-based highly variable gene count."
+                },
+                "n_pcs": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Number of principal components for dimred/neighbors."
+                },
+                "n_neighbors": {
+                    "type": "integer",
+                    "default": 15,
+                    "description": "Neighborhood size for the kNN graph / UMAP."
+                },
+                "leiden_resolutions": {
+                    "type": "string",
+                    "default": "0.25,0.5,1.0",
+                    "description": "Comma-separated Leiden resolutions to compute."
+                },
+                "leiden_key_resolution": {
+                    "type": "number",
+                    "default": 1.0,
+                    "description": "Leiden resolution used downstream for annotation."
+                },
+                "celltypist_model": {
+                    "type": "string",
+                    "default": "Immune_All_Low.pkl",
+                    "description": "CellTypist model for RNA annotation."
+                },
+                "integration_methods": {
+                    "type": "string",
+                    "default": "scvi,scanvi,bbknn",
+                    "description": "Comma-separated subset of scvi,scanvi,bbknn to benchmark for cohort integration."
+                },
+                "integration_batch_key": {
+                    "type": "string",
+                    "default": "batch",
+                    "description": ".obs key used as the integration batch (rna_qc.py stamps batch=sample_id by default)."
+                },
+                "de_method": {
+                    "type": "string",
+                    "default": "wilcoxon",
+                    "enum": [
+                        "wilcoxon",
+                        "mast",
+                        "edger",
+                        "pertpy"
+                    ],
+                    "description": "Differential-expression method (wilcoxon is robust for the 1-Dx/1-Rel cohort)."
+                },
+                "de_groupby": {
+                    "type": "string",
+                    "default": "cell_type",
+                    "description": ".obs key to group cells by for DE."
+                },
+                "velocity_loom_dir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Directory of <sample>.loom velocyto outputs (required when run_velocity is enabled)."
+                },
+                "prot_norm_method": {
+                    "type": "string",
+                    "default": "clr",
+                    "enum": [
+                        "clr",
+                        "dsb"
+                    ],
+                    "description": "Protein/ADT normalization (CLR default; DSB needs a raw matrix)."
+                },
+                "prot_leiden_resolution": {
+                    "type": "number",
+                    "default": 1.0,
+                    "description": "Leiden resolution for protein-branch clustering/annotation."
+                },
+                "rna_preprocessing_container": {
+                    "type": "string",
+                    "default": "dde27-rna-preprocessing:0.1",
+                    "description": "Container for RNA QC / normalize / feature-select."
+                },
+                "rna_clustering_container": {
+                    "type": "string",
+                    "default": "dde27-rna-clustering:0.1",
+                    "description": "Container for RNA dimred / cluster."
+                },
+                "rna_annotation_container": {
+                    "type": "string",
+                    "default": "dde27-rna-annotation:0.1",
+                    "description": "Container for RNA annotation."
+                },
+                "rna_integration_container": {
+                    "type": "string",
+                    "default": "dde27-rna-integration:0.1",
+                    "description": "Container for RNA cohort integration."
+                },
+                "rna_pseudotime_container": {
+                    "type": "string",
+                    "default": "dde27-rna-pseudotime:0.1",
+                    "description": "Container for RNA pseudotime."
+                },
+                "rna_velocity_container": {
+                    "type": "string",
+                    "default": "dde27-rna-velocity:0.1",
+                    "description": "Container for RNA velocity."
+                },
+                "rna_de_container": {
+                    "type": "string",
+                    "default": "dde27-rna-de:0.1",
+                    "description": "Container for RNA differential expression."
+                },
+                "composition_container": {
+                    "type": "string",
+                    "default": "dde27-composition:0.1",
+                    "description": "Container for compositional analysis."
+                },
+                "protein_container": {
+                    "type": "string",
+                    "default": "dde27-protein:0.1",
+                    "description": "Container for the protein/ADT branch."
+                }
+            }
         }
     },
     "allOf": [
@@ -414,6 +601,9 @@
         },
         {
             "$ref": "#/$defs/platform_options"
+        },
+        {
+            "$ref": "#/$defs/rna_downstream_options"
         }
     ]
 }

@@ -1,0 +1,16 @@
+Bootstrap: docker
+From: mambaorg/micromamba:1.5.8
+
+%files
+    /mnt/scratch/users/hbp534/DDE_27_CITE_seq_python_analysis/clustering.yml /opt/env.yml
+
+%post
+    # NB: not /tmp — Apptainer bind-mounts the host /tmp over the container's during %post,
+    # which would hide a yml copied there by %files.
+    micromamba install -y -n base -f /opt/env.yml
+    # procps -> `ps`, required by Nextflow's task metric collector; via conda to avoid apt/fakeroot.
+    micromamba install -y -n base -c conda-forge procps-ng
+    micromamba clean -a -y
+
+%environment
+    export PATH=/opt/conda/bin:$PATH
