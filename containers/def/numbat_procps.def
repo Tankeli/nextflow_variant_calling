@@ -1,0 +1,21 @@
+# Re-vendor DDE_32's numbat.sif with procps so `ps` is on PATH. Nextflow's task metric collector
+# (and the co2footprint plugin) hard-require `ps`; without it the report/timeline/trace/dag
+# observers fail on every numbat.sif-backed task, which is why conf/viking.config currently disables
+# them. Build this on the LOGIN node (compute nodes lack internet + fakeroot), point
+# `numbat_container` at the result, then re-enable the report blocks in conf/viking.config.
+#
+#   apptainer build --fakeroot containers/sif/numbat_procps.sif containers/def/numbat_procps.def
+#   # then in params/-params-file:  numbat_container: <abs path>/numbat_procps.sif
+#
+# numbat-rbase is Debian-based, so apt provides procps. If --fakeroot is unavailable on Viking,
+# build where you have it (or ask RSE) — this is a one-off image bake.
+
+Bootstrap: localimage
+From: /mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/singularity/numbat.sif
+
+%post
+    apt-get update && apt-get install -y --no-install-recommends procps && rm -rf /var/lib/apt/lists/*
+    command -v ps >/dev/null || { echo "ERROR: ps still missing after install" >&2; exit 1; }
+
+%test
+    command -v ps

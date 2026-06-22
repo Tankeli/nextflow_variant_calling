@@ -50,11 +50,26 @@ def main():
     sc.pp.log1p(adata_ct)
     adata_ct.X = adata_ct.X.toarray()
 
-    wanted = {"Immune_All_High.pkl", "Immune_All_Low.pkl", args.celltypist_model}
-    models.download_models(force_update=False, model=sorted(wanted))
+    # Offline path: when CELLTYPIST_MODEL_DIR points at a folder of pre-downloaded .pkl models
+    # (compute nodes have no internet), unpickle them directly. celltypist's Model.load() can't be
+    # used here: it calls get_all_models() -> download_if_required(), which hits the network even
+    # when given an absolute path. Otherwise fall back to celltypist's normal download.
+    model_dir = os.environ.get("CELLTYPIST_MODEL_DIR")
 
-    model_high = models.Model.load(model="Immune_All_High.pkl")
-    model_low = models.Model.load(model="Immune_All_Low.pkl")
+    def _load_model(name):
+        if model_dir:
+            import pickle
+            with open(os.path.join(model_dir, name), "rb") as fh:
+                o = pickle.load(fh)
+            return models.Model(o["Model"], o["Scaler_"], o["description"])
+        return models.Model.load(model=name)
+
+    if not model_dir:
+        wanted = {"Immune_All_High.pkl", "Immune_All_Low.pkl", args.celltypist_model}
+        models.download_models(force_update=False, model=sorted(wanted))
+
+    model_high = _load_model("Immune_All_High.pkl")
+    model_low = _load_model("Immune_All_Low.pkl")
 
     pred_high = celltypist.annotate(adata_ct, model=model_high, majority_voting=True).to_adata()
     adata.obs["celltypist_cell_label_coarse"] = pred_high.obs.loc[adata.obs.index, "majority_voting"]

@@ -63,11 +63,6 @@
                     "default": true,
                     "description": "Pool Dx+Rel per patient (cross-timepoint comparable clone IDs)"
                 },
-                "numbat_per_sample": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Additionally run Numbat per sample"
-                },
                 "numbat_max_entropy": {
                     "type": "number",
                     "default": 0.8,
@@ -397,6 +392,11 @@
             "type": "object",
             "description": "Scanpy/muon downstream analysis run parallel to the variant callers off the Cell Ranger matrices: RNA core (QC->normalize->feature-select->dimred->cluster->annotate), cohort integration, advanced (pseudotime/velocity/DE/composition) and a surface-protein/ADT branch. All OFF by default.",
             "properties": {
+                "downstream_samplesheet": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "CSV (sample,patient,timepoint,matrix) for the standalone DOWNSTREAM entry: runs the RNA stack off already-published Cell Ranger filtered matrices."
+                },
                 "run_rna_core": {
                     "type": "boolean",
                     "default": false,
@@ -451,6 +451,11 @@
                     "type": "integer",
                     "default": 20,
                     "description": "Drop genes expressed in fewer than this many cells."
+                },
+                "run_soupx": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "SoupX ambient-RNA correction. Consumes the per-sample raw matrix (CELLRANGER.out.raw). Enabling it changes the CELLRANGER_MULTI task hash, so the next -resume re-runs Cell Ranger once."
                 },
                 "run_scdblfinder": {
                     "type": "boolean",

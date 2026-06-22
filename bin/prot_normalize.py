@@ -53,7 +53,9 @@ def main():
                 method = "clr"
 
     if method == "clr":
-        mu.prot.pp.clr(mdata)
+        # clr operates on the protein AnnData; passing the whole MuData hits MuData.X == None
+        # (TypeError in np.log1p). Pass the 'prot' modality explicitly (modified in place).
+        mu.prot.pp.clr(mdata["prot"])
         print("CLR normalization complete")
 
     mdata.write(args.out)

@@ -13,7 +13,6 @@ run_souporcell: true
 
 # Numbat
 numbat_joint:       true
-numbat_per_sample:  false
 numbat_max_entropy: 0.8
 numbat_min_llr:     3
 
@@ -27,3 +26,9 @@ numbat_snpvcf:    /data/genome1K.phase3.SNP_AF5e2.chr1toX.hg38.vcf
 numbat_paneldir:  /data/1000G_hg38
 numbat_gmap:      /Eagle_v2.4.1/tables/genetic_map_hg38_withX.txt.gz
 souporcell_fasta: references/refdata-gex-GRCh38-2024-A/fasta/genome.fa
+
+# Annotation branch — reference mapping requires an atlas .h5ad (no built-in default; the
+# pipeline errors out if run_reference_mapping is on and these are unset). Edit to your atlas,
+# or set run_reference_mapping: false to skip the annotation branch.
+refmap_atlas:     /mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/references/paediatric_bm_reference/bone_marrow_atlas.h5ad
+refmap_umap:      /mnt/scratch/users/hbp534/DDE_32_paediatric_snv_analysis/references/paediatric_bm_reference/bone_marrow_atlas_umap_seed123.tsv

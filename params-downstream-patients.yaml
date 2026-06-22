@@ -1,0 +1,27 @@
+# Downstream-only run of the RNA best-practices stack (ported from DDE_27) over the prototype AML
+# cohort, OFF the already-published Cell Ranger filtered matrices — no Cell Ranger re-run, no
+# variant callers. Launch the DOWNSTREAM entry:
+#   nextflow run . -entry DOWNSTREAM -profile viking -params-file params-downstream-patients.yaml
+# (see jobs/run_downstream_patients.sh)
+
+# Existing filtered matrices (sample,patient,timepoint,matrix); resolved from results_patients/.
+downstream_samplesheet: /mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling/assets/downstream_patients_samplesheet.csv
+outdir: /mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling/results_downstream_patients
+
+# Everything except velocity (no velocyto looms) and SoupX (raw matrix not published on this path).
+run_rna_core:        true
+run_rna_integration: true
+run_pseudotime:      true
+run_de:              true
+run_composition:     true
+run_protein:         true
+run_velocity:        false
+run_soupx:           false
+
+# Cohort integration batches by sample (rna_qc.py stamps batch=sample_id by default).
+integration_methods:   scvi,scanvi,bbknn
+integration_batch_key: batch
+
+# DE: Wilcoxon Rel-vs-Dx per cell type (robust for the 1-Dx/1-Rel cohort).
+de_method:  wilcoxon
+de_groupby: cell_type

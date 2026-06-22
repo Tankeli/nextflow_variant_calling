@@ -1,0 +1,55 @@
+name: CI
+
+# Lightweight wiring checks — no heavy compute. The stub run exercises the full DAG with the
+# tiny test fixtures so channel/join regressions (e.g. the visualisation joins) fail here, fast.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stub:
+    name: Stub DAG run (-profile test -stub)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        NXF_VER: ['24.04.0', 'latest-stable']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Nextflow
+        env:
+          NXF_VER: ${{ matrix.NXF_VER }}
+        run: |
+          curl -fsSL https://get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/
+
+      - name: Run stub
+        run: |
+          nextflow run . -profile test -stub \
+            -work-dir work_stub --outdir results_ci
+
+  schema-lint:
+    name: nf-core schema lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install nf-core
+        run: pip install nf-core
+      # Keeps nextflow_schema.json in sync with the params declared in nextflow.config.
+      - name: Lint pipeline schema
+        run: nf-core pipelines schema lint --schema nextflow_schema.json || nf-core schema lint

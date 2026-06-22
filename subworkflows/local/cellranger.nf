@@ -32,6 +32,7 @@ workflow CELLRANGER {
 
     emit:
     aln      = ch_aln
+    raw      = CELLRANGER_MULTI.out.raw   // [ meta, raw_feature_bc_matrix.h5 ] (for SoupX)
     outs     = CELLRANGER_MULTI.out.outs
     versions = ch_versions
 }

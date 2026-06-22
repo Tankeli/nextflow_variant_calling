@@ -34,13 +34,17 @@ Outputs (`results/`):
 | Stage | Path | Key file |
 |---|---|---|
 | Cell Ranger | `cellranger/<sample>/outs/` | `possorted_genome_bam.bam`, `filtered_feature_bc_matrix/` |
-| Numbat | `numbat_joint/<patient>/numbat_out/` | `clone_post_1.tsv`, `segs_consensus_*.tsv`; built-in panels `bulk_clones_*.png`, `bulk_subtrees_*.png`, `exp_roll_clust.png`, `panel_*.png` |
-| Numbat pileup | `numbat_joint/<patient>/<patient>_pileup/` | `<sample>_allele_counts.tsv.gz` |
-| CopyKAT | `copykat/<sample>/` | `<sample>_copykat_prediction.txt`, `*_copykat_with_genes_heatmap.pdf`; `figures/<sample>_copykat_umap.*` (call + cell type on the reference UMAP) |
-| Souporcell | `souporcell/<patient>/k<K>/` | `clusters.tsv`; `figures/<patient>_souporcell_umap.*`, `_souporcell_composition.*` |
-| CloneTracer | `clonetracer/<patient>/` | `<patient>_clone_assignments.csv` (per-cell clone + posterior), `<patient>_out.pickle`, `<patient>_tree.pickle`, `<patient>.json`; `figures/<patient>_clonetracer_umap.*` (clones + posterior + timepoint on the reference UMAP), `_clonetracer_composition.*` |
-| QC (scanpy) | `qc/<sample>/` | `<sample>_qc.h5ad`, `<sample>_qc_metrics.csv`, `<sample>_qc_panel.*` |
-| Reference mapping | `reference_mapping/<sample>/` | `<sample>_celltypes.csv`, `<sample>_mapped.h5ad`, `<sample>_mapping_umap.*` |
+| Numbat | `callers/numbat/<patient>/numbat_out/` | `clone_post_1.tsv`, `segs_consensus_*.tsv`; built-in panels `bulk_clones_*.png`, `bulk_subtrees_*.png`, `exp_roll_clust.png`, `panel_*.png` |
+| Numbat pileup | `callers/numbat/<patient>/<patient>_pileup/` | `<sample>_allele_counts.tsv.gz` |
+| CopyKAT | `callers/copykat/<sample>/` | `<sample>_copykat_prediction.txt`, `*_copykat_with_genes_heatmap.pdf`; `figures/<sample>_copykat_umap.*` (call + cell type on the reference UMAP) |
+| Souporcell | `callers/souporcell/<patient>/k<K>/` | `clusters.tsv`; `figures/<patient>_souporcell_umap.*`, `_souporcell_composition.*` |
+| CloneTracer | `callers/clonetracer/<patient>/` | `<patient>_clone_assignments.csv` (per-cell clone + posterior), `<patient>_out.pickle`, `<patient>_tree.pickle`, `<patient>.json`; `figures/<patient>_clonetracer_umap.*` (clones + posterior + timepoint on the reference UMAP), `_clonetracer_composition.*` |
+| QC (scanpy) | `annotation/qc/<sample>/` | `<sample>_qc.h5ad`, `<sample>_qc_metrics.csv`, `<sample>_qc_panel.*` |
+| Reference mapping | `annotation/reference_mapping/<sample>/` | `<sample>_celltypes.csv`, `<sample>_mapped.h5ad`, `<sample>_mapping_umap.*` |
+| Multi-modal (opt-in) | `multimodal/integration/<patient>/`, `multimodal/lsc_scoring/<sample>/` | Phase-0 master table, LSC scores, `headline/` clonal-tracing Sankeys |
+| RNA stack (opt-in) | `rna/{core,integration,pseudotime,velocity,de,composition}/` | per-sample + cohort scanpy checkpoints |
+| Protein (opt-in) | `protein/{per_sample,integrated}/` | ADT QC / normalize / batch-correct / annotate |
+| CopyKAT robustness (opt-in) | `robustness/<sample>/` | seed×param sweep + `_analysis/` summaries |
 | Cohort summary | `pipeline_info/` | `cohort_summary.{png,pdf,csv}` |
 | Provenance | `pipeline_info/` | nf-prov BCO, co2footprint, execution report/timeline/trace/dag |
 
@@ -49,8 +53,8 @@ Outputs (`results/`):
 Each stage emits diagnostic figures alongside its data checkpoint (read directly from the published
 output, so they add negligible compute and stay `-resume`-friendly):
 
-- **QC panel** (`qc/`) — per-sample 3×3: gene/UMI/MT/doublet distributions + pass/fail.
-- **Mapping UMAP** (`reference_mapping/`) — cell types, confidence, poorly-mapped, in the shared
+- **QC panel** (`annotation/qc/`) — per-sample 3×3: gene/UMI/MT/doublet distributions + pass/fail.
+- **Mapping UMAP** (`annotation/reference_mapping/`) — cell types, confidence, poorly-mapped, in the shared
   paediatric reference-map space.
 - **CopyKAT / souporcell overlays** — the aneuploid call and the per-patient clones plotted on that
   same reference UMAP (`--refmap_umap`, default the frozen seed-123 atlas embedding). Because the
@@ -94,6 +98,9 @@ nextflow run . -profile test -stub
 
 # 3. Real run (edit params.yaml first). Keep outdir + work-dir on /mnt/scratch.
 nextflow run . -profile apptainer -params-file params.yaml -resume
+
+# 4. (optional) RNA downstream stack only, off already-published Cell Ranger matrices
+nextflow run . -entry DOWNSTREAM -profile viking -params-file params-downstream-patients.yaml
 ```
 
 Toggle callers with `--run_numbat`, `--run_copykat`, `--run_souporcell`, `--run_clonetracer`. Numbat
@@ -102,6 +109,15 @@ thresholds (`--numbat_max_entropy`, `--numbat_min_llr`) and the souporcell K swe
 genotypes, swaps the mtDNA caller via `--clonetracer_mtdna_method cellsnp|mgatk`, and can use a GPU
 with `--clonetracer_gpu`. Container images are set via
 `--{cellranger,numbat,copykat,souporcell,samtools,clonetracer}_container`.
+
+**Optional, default-off downstream tracks** (none gate the callers): `--run_integration` (per-patient
+Phase-0 master table + LSC scoring + headline clonal-tracing Sankeys), the DDE_27 RNA best-practices
+stack and protein/ADT branch via the `RNA_DOWNSTREAM` subworkflow (`--run_rna_core`,
+`--run_rna_integration`, `--run_pseudotime`, `--run_velocity`, `--run_de`, `--run_composition`,
+`--run_protein`), and `--run_copykat_robustness`. Reference mapping needs an atlas — set
+`--refmap_atlas` (and optionally `--refmap_umap`); there is no built-in default and the run errors out
+early if it is unset. The RNA stack can also run on its own via `-entry DOWNSTREAM` (step 4 above),
+consuming published matrices listed in a `--downstream_samplesheet` CSV — no Cell Ranger / caller re-run.
 
 ## Viking HPC / storage
 

@@ -11,8 +11,18 @@ exploratory analysis in the sibling project `../DDE_32_paediatric_snv_analysis`.
 
 The pipeline takes scRNA-seq (CITE-seq: GEX + Antibody Capture) FASTQ through Cell Ranger and
 three variant-calling tools, emitting standardized, resumable per-sample / per-patient variant
-checkpoints. The downstream multi-modal integration (Phase-0 per-cell master table, clonal-tracing
-Sankey figures) currently stays in DDE_32 and consumes this pipeline's outputs.
+checkpoints.
+
+> **Scope note (kept current):** the original boundary was "FASTQ → variant checkpoints +
+> annotation; multi-modal integration stays in DDE_32." That has since been pulled in-repo as
+> *optional, default-off* tracks so the whole analysis is one resumable pipeline: (a) the per-patient
+> integration layer (Phase-0 master table, LSC scoring, headline clonal-tracing Sankeys —
+> `run_integration`); (b) the DDE_27 RNA best-practices stack (norm → HVG → dimred → cluster →
+> annotate → integrate → pseudotime/velocity/DE/composition) and a protein/ADT branch, consolidated
+> in the `RNA_DOWNSTREAM` subworkflow; (c) the CopyKAT robustness sweep (`run_copykat_robustness`).
+> The RNA stack also has a standalone `-entry DOWNSTREAM` that runs off already-published Cell Ranger
+> matrices (no caller / Cell Ranger re-run). The variant callers remain the default backbone; every
+> added track is gated off by default and none of them gate caller inputs.
 
 > As of the start of this work the directory is empty apart from this file and `scratchpad.md`
 > (the build plan). Read `scratchpad.md` for the current implementation phase and task status.
@@ -34,8 +44,11 @@ souporcell so clone IDs are comparable across timepoints — per-sample clone ID
 
 ## Pipeline scope (agreed decisions)
 
-- **Boundaries**: FASTQ → variant checkpoints + a parallel cell-annotation branch. Cell Ranger is
-  wrapped upstream; the multi-modal integration (Phase-0 master table, Sankeys) stays in DDE_32.
+- **Boundaries**: FASTQ → variant checkpoints + a parallel cell-annotation branch is the default
+  backbone. Cell Ranger is wrapped upstream. The multi-modal integration (Phase-0 master table,
+  Sankeys), the DDE_27 RNA best-practices stack + protein/ADT branch (`RNA_DOWNSTREAM`, also a
+  standalone `-entry DOWNSTREAM`), and the CopyKAT robustness sweep are now **in-repo as optional,
+  default-off tracks** (see the scope note above) rather than living in DDE_32.
 - **Callers included**: Numbat (CNV, primary clonal axis), CopyKAT (expression-based aneuploidy
   gate), souporcell (SNV genotype clusters), and **CloneTracer** (veltenlab) as a *downstream*
   Bayesian clonal-integration branch — it is not a de-novo caller; it consumes per-cell M/N counts
@@ -63,20 +76,25 @@ Each stage is resumable with a stable output contract under `results/`:
    `nf-core/scrnaseq` as a sub-pipeline.
 2. **NUMBAT** → `NUMBAT_PILEUP` (per-sample and joint-per-patient `pileup_and_phase.R`) →
    `*_allele_counts.tsv.gz`; then `NUMBAT_RUN` (`run_numbat()`, relaxed thresholds
-   `max_entropy=0.8`, `min_LLR=3`) → `results/numbat_joint/<patient>/numbat_out/`.
-3. **COPYKAT** (per-sample) → `results/copykat/<sample>/*_copykat_prediction.txt`.
+   `max_entropy=0.8`, `min_LLR=3`) → `results/callers/numbat/<patient>/numbat_out/`.
+3. **COPYKAT** (per-sample) → `results/callers/copykat/<sample>/*_copykat_prediction.txt`.
 4. **SOUPORCELL** (optional noNK barcode subset → per-patient CB-retag + merge + sort →
-   `souporcell_pipeline.py` over a K sweep) → `results/souporcell/<patient>/k<K>/clusters.tsv`.
+   `souporcell_pipeline.py` over a K sweep) → `results/callers/souporcell/<patient>/k<K>/clusters.tsv`.
 5. **CLONETRACER** (downstream, joint per patient) → `MTDNA_PILEUP` (per sample, cellsnp-lite on
    chrM; mgatk opt-in) + `CLONETRACER_BUILD` (synthesise per-cell M/N over CNV/SNV/mtDNA →
    `<patient>.json`) + `CLONETRACER` (`run_clonetracer.py`, pyro) →
-   `results/clonetracer/<patient>/<patient>_clone_assignments.csv` + `_out.pickle` + `_tree.pickle`.
+   `results/callers/clonetracer/<patient>/<patient>_clone_assignments.csv` + `_out.pickle` + `_tree.pickle`.
    Gated by `run_clonetracer`; uses whatever caller sources are available (mtDNA alone suffices).
-6. **ANNOTATION (parallel branch)** — `SCANPY_QC` (per sample) → `results/qc/<sample>/<sample>_qc.h5ad`
+6. **ANNOTATION (parallel branch)** — `SCANPY_QC` (per sample) → `results/annotation/qc/<sample>/<sample>_qc.h5ad`
    + `_qc_metrics.csv`; then `REFERENCE_MAPPING` (per sample, ingest onto the atlas) →
-   `results/reference_mapping/<sample>/<sample>_celltypes.csv` + `_mapped.h5ad`. Gated by
+   `results/annotation/reference_mapping/<sample>/<sample>_celltypes.csv` + `_mapped.h5ad`. Gated by
    `run_qc` / `run_reference_mapping` (reference mapping implies QC).
-7. **Provenance**: `results/pipeline_info/` — nf-prov BCO/legacy manifests + co2footprint
+7. **Optional downstream tracks** (default off; none gate the callers): multi-modal integration →
+   `results/multimodal/{integration/<patient>,lsc_scoring/<sample>}/` (`run_integration`); the DDE_27
+   RNA stack → `results/rna/{core,integration,pseudotime,velocity,de,composition}/` and the protein
+   branch → `results/protein/{per_sample,integrated}/` (via `RNA_DOWNSTREAM`, also `-entry DOWNSTREAM`);
+   the CopyKAT robustness sweep → `results/robustness/<sample>/` (`run_copykat_robustness`).
+8. **Provenance**: `results/pipeline_info/` — nf-prov BCO/legacy manifests + co2footprint
    trace/report/summary + Nextflow execution report/timeline.
 
 ## Containers / environments

@@ -1,3 +1,12 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# VENDORED — CloneTracer (Velten lab) clonal-inference model. Do NOT refactor in place.
+#
+# This is third-party upstream code (pyro Bayesian tree inference; `class tree` + SVI helpers),
+# imported only by run_clonetracer.py. It is deliberately kept as a single verbatim module so it
+# can be diffed against / re-synced from upstream rather than diverging. If it needs changes,
+# update upstream and re-vendor, or wrap it from run_clonetracer.py — don't carve it up by concern.
+#   Upstream: https://github.com/veltenlab/CloneTracer   (pin the exact commit here when known)
+# ─────────────────────────────────────────────────────────────────────────────
 # file with helper functions to find the best tree(s) heuristically
 
 # Import packages

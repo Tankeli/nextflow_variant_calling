@@ -10,7 +10,7 @@
 #
 # Downsample confounder analysis: per-(sample,fraction) stability, then the ARI-vs-N summary.
 # Run after the downsample sweep array completes. Reuses the existing full-N (100%) stability from
-# results_controls/copykat_robustness/_analysis as the anchor point.
+# results_controls/robustness/_analysis as the anchor point.
 set -euo pipefail
 PROJECT=/mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling
 cd "${PROJECT}"
@@ -18,7 +18,7 @@ export PATH="${PROJECT}/bin:${PATH}"
 module load Miniconda3/23.5.2-0
 source activate aml_scrna
 
-DS=results_controls/copykat_robustness_downsample
+DS=results_controls/robustness_downsample
 OUT=${DS}/_analysis
 mkdir -p "${OUT}"
 
@@ -37,7 +37,7 @@ done
 # 2. ARI-vs-N summary (+ figure), reusing the full-N points
 copykat_downsample_summary.py \
     "${PROJECT}/${OUT}" \
-    "${PROJECT}/results_controls/copykat_robustness/_analysis" \
+    "${PROJECT}/results_controls/robustness/_analysis" \
     "${PROJECT}/${OUT}/downsample" \
     PBM_2:7302 PBM_1:6248 PBMMC_3:5548
 

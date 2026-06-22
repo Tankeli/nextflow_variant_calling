@@ -360,6 +360,135 @@ Python. Plan: `.claude/plans/ticklish-herding-wilkinson.md`.
         re-run `jobs/run_copykat_robustness.sh` for the stability/boundary outputs (cheap; atlas
         gene-set cache + drivers already present).
 
+### Reconciliation note — downstream stack already landed (unlogged) — 2026-06-22
+The phases above stop at 9, but the scRNA-seq best-practices downstream stack has since landed
+(commit `ad7ade8` + working tree) and is NOT logged here. Treat the following as DONE-but-unlogged
+when planning the additions below — the new modules plug into these, they don't replace them:
+- **RNA downstream** (`subworkflows/local/rna_downstream.nf` → `rna_core` / `rna_integration` /
+  `rna_advanced`): per-sample QC→norm→feature-select→dimred→cluster→annotate, cohort integration
+  (scVI/scANVI/BBKNN + scib), pseudotime (**DPT**), velocity (**scVelo**), DE, composition. SoupX
+  ambient + Scrublet/**scDblFinder** doublets. All gated `run_rna_*` (default OFF).
+- **Protein/ADT branch** (`subworkflows/local/protein.nf`): QC→normalize→doublet→dimred→batch→
+  annotate (CITE-seq only, gated `run_protein`).
+- **Integration / Phase-0** (`subworkflows/local/integration.nf`): `LSC_SCORING` (weighted
+  **pLSC6 + LSC17**), `PHASE0_INTEGRATION` (per-cell master table joining Numbat+souporcell clones
+  with CopyKAT/cell type/LSC), `HEADLINE_FIGURES` (Sankeys). Gated `run_integration`.
+
+This means, vs the snakemake plan, P1 / P2(ref-map) / P3(mtDNA via CloneTracer) / P7(LSC) are
+partly covered. The additions below are the **plan features with zero code** — the novel modules
+(A/B/C/D), fusion detection, and the missing per-cell evidence channels — re-expressed as Nextflow.
+
+---
+
+## Additions from the scRNA-seq analysis plan (`scRNA-seq_planning.md`)
+Keep the nf-core/Nextflow structure and everything built so far. The snakemake plan's 10 phases map
+onto features we have NOT built; port them as gated modules/subworkflows that run **parallel** to the
+callers and feed the Phase-0 master table (and, where noted, CloneTracer / the new classifier). All
+default OFF, same conventions (per-sample vs joint-per-patient, `publishDir mode:'link'`, stubs,
+viking-profile conda/sif hooks, schema group per feature). Each keeps the plan's Module A–D naming
+for traceability. Ordering reflects the plan's evidence→fusion→capstone layering.
+
+### Phase 10 — Fusion detection branch (plan P2 stream 2; **primary malignant tag in paed AML**) — TODO
+Highest scientific priority of the gaps — fusion⁺ is a near-unambiguous, DNA-free malignancy call.
+- [ ] `modules/local/fusion_pseudobulk.nf` — pseudobulk per sample (and per cluster once `rna_core`
+      labels exist) → **Arriba** (default) / STAR-Fusion from the CellRanger BAM, to *nominate*
+      fusions. Container: arriba biocontainer.
+- [ ] `modules/local/fusion_per_cell.nf` — per-cell junction-spanning read counting at nominated /
+      known driver breakpoints → per-cell `fusion_status`. Known breakpoints from a new
+      `--fusion_known_sites` param (diagnostic workup) so we can score even without de-novo calls.
+- [ ] `subworkflows/local/fusion.nf` (`FUSION_WF`, gated `run_fusion`); emit per-cell fusion table.
+- [ ] Wire into `variantcalling.nf` parallel to callers; feed `PHASE0_INTEGRATION` + Module A.
+- [ ] Defer long-read (CTAT-LR-fusion / scNanoGPS) behind a `--fusion_longread` switch — not in
+      current data ([[assumptions: confirm 5' vs 3' chemistry — 5' gives far better fusion coverage]]).
+
+### Phase 11 — Per-cell variant evidence channels (plan P3) — TODO
+Strengthen the DNA-free barcodes beyond the CloneTracer-internal feeds; emit standalone per-cell
+channels for the classifier + the master table.
+- [ ] **Expressed nuclear variants** — `modules/local/vartrix.nf` (**VarTrix**, cb_sniffer
+      alternative) at known driver SNV sites (`--snv_known_sites` VCF) → per-cell genotype matrix.
+      Feeds Module A and offers an alt SNV axis to CloneTracer (vs souporcell). Gated `run_vartrix`.
+- [ ] **mtDNA informative variants + feasibility** — extend `MTDNA_PILEUP` with **MQuad**
+      (informative-variant calling) + **vireoSNP** (clustering) → per-cell mito heteroplasmy matrix
+      **plus a feasibility report** (variant recovery from 3' CITE-seq; the plan flags this as likely
+      sparse → demote to soft evidence). Gated `run_mtdna_clones`. Document MAESTER/mtscATAC as the
+      enrichment fallback on relapse pairs only.
+
+### Phase 12 — Module B: surface-proteome anomaly detection (plan P5) — TODO
+LAIP-analogue: train the normal surface proteome as a null, flag malignancy as OOD on protein.
+- [ ] Extend the protein branch with **DSB** normalization retaining isotype controls (current
+      `prot_normalize` may need the empty-droplet + isotype inputs) — prerequisite for a clean null.
+- [ ] `bin/surface_anomaly.py` — one-class/OOD on normal-marrow ADT: Mahalanobis on the totalVI/ADT
+      latent (or normal-only VAE recon error / scArches query-distance) → per-cell
+      `surface_anomaly_score` + driving aberrant marker combinations.
+- [ ] `modules/local/surface_anomaly.nf` + wire into `protein.nf`, gated `run_surface_anomaly`.
+- [ ] Output → Phase-0 table + Module A; doubles as the external LAIP/MRD validation bridge (P9).
+
+### Phase 13 — Module A: multi-evidence malignancy/clone classifier (plan P4, capstone-feeder) — TODO
+Fuses the individually-weak DNA-free channels into a calibrated per-cell call. CloneTracer is the
+closest existing piece but is variant-centric; this is the channel-fusion classifier the plan wants.
+- [ ] `bin/malignancy_classifier.py` — per-cell posterior over {normal, pre-leukemic, leukemic} +
+      clone label, fusing: fusion⁺ (P10, strong), expressed-variant genotype (P11), mito
+      heteroplasmy (P11, soft — propagate uncertainty), RNA reference-projection deviation (needs an
+      explicit per-cell deviation score out of `reference_mapping.py`), ADT surface-anomaly (P12), and
+      a normal-clonality null. **numpyro** graphical model or calibrated **xgboost** ensemble,
+      semi-supervised / anchored on fusion⁺ cells. Emit per-cell posteriors + credible intervals +
+      channel-wise attribution; keep an explicit "uncertain boundary" class.
+- [ ] `modules/local/malignancy_classifier.nf` + `subworkflows/local/classifier.nf`, gated
+      `run_malignancy_classifier` (requires ≥1 evidence channel; errors early if none enabled).
+- [ ] Feeds Phase-0 master table (malignancy posterior column) and gates LSC restriction + Module D.
+
+### Phase 14 — Module D: relapse-supervised fate labeling (plan P8, **project end goal**) — TODO
+The capstone. Uses the Dx→Rel pair as a free prospective fate readout.
+- [ ] `bin/relapse_ot.py` — **moscot** `TemporalProblem` mapping Dx→Rel on the joint CITE-seq
+      embedding (from `rna_integration`), **unbalanced** OT (`--ot_tau_a/--ot_tau_b`; therapy is
+      mass-destroying), conserved-core cost. Ancestor probabilities → per-Dx-cell
+      `relapse_seeding_score`. Restrict to malignant + stem-like (Module A + LSC).
+- [ ] Cross-patient: learn a pooled, subtype-stratified "relapse-competent LSC" signature, apply to
+      diagnosis-only patients. Must handle [[cohort-not-all-paired]] (only run OT where a Dx+Rel pair
+      exists; signature-transfer arm covers standalone samples).
+- [ ] `modules/local/relapse_ot.nf` + `subworkflows/local/relapse_fate.nf`, gated `run_relapse_ot`
+      (requires `run_rna_integration` + classifier + LSC). GPU note: JAX/OTT — viking GPU partition +
+      a scvi/moscot GPU container (cf. [[clonetracer-env-slow]] perf lesson).
+
+### Phase 15 — Module C: proteogenomic anchoring (bulk MS) (plan P6) — TODO (feasibility-gated, lower priority)
+Orthogonal protein-level malignancy anchor from matched **bulk** proteomics. NOTE: the existing
+`prot_*` modules are **CITE-seq ADT**, not bulk MS — this is a new, separate ingest.
+- [ ] Confirm acquisition first (DDA vs DIA + depth) — this gates whether fusion-peptide detection is
+      viable at all (plan risk register). Don't build until confirmed.
+- [ ] Bulk MS ingest (DIA-NN / FragPipe) via an extended sample sheet (`modality=bulk_ms`).
+- [ ] `bin/proteogenomic_anchor.py` — custom search DB augmented with **fusion-junction peptides**
+      (from P10) + known variant peptides → sample-level malignant anchor; bulk↔single-cell
+      consistency constraint (NNLS / BayesPrism-style, caveated).
+- [ ] Gated `run_proteogenomics`; output sample-level anchor + consistency metric (validation use).
+
+### Phase 16 — Validation framework (plan P9) — TODO
+- [ ] `subworkflows/local/validation.nf` (gated `run_validation`): cross-patient hold-out for Module D
+      + LSC signature; cross-modal consistency (RNA vs ADT vs proteomic malignancy agreement, report
+      boundary disagreement); LAIP/MRD bridge for Module B; negative controls (healthy → ~no malignant
+      calls — we already have the Caron/[[caron-healthy-controls]] run); Module A channel ablations.
+- [ ] Stats: mixed models with patient as random effect; multiple-testing control.
+
+### Cross-cutting additions
+- [ ] **Reference-projection deviation score** — `reference_mapping.py` already does ingest; add an
+      explicit per-cell novelty/deviation score output (feeds Module A). Couples with the existing
+      Phase-6 TODO to add Symphony/scANVI rigor behind `--refmap_method`.
+- [ ] **CellBender** as an optional ambient arm (`--ambient_method cellbender|soupx`, GPU) — plan P1
+      prefers CellBender; we currently ship SoupX only.
+- [ ] **Data governance** (plan §0, human patient data): ensure `.gitignore` blocks all data/binary
+      (`*.h5ad/*.bam/*.fastq*/*.mtx`, proteomics raw), add a pre-commit large-file block, and a
+      `PROVENANCE.md` (ethics ref / consent scope / lineage). DVC/git-annex pointing at Viking storage
+      is optional but fits the enclave model.
+
+### Suggested build order for the additions
+1. **Phase 10 fusion** (highest-value single channel, mostly existing tooling).
+2. **Phase 11 evidence channels** (VarTrix + MQuad/vireo feasibility) — cheap, de-risks Module A.
+3. **Phase 12 surface anomaly** (runs on existing CITE-seq, no new data).
+4. **Phase 13 Module A** (fuses 10–12 + ref-deviation; the methodological core).
+5. **Phase 14 Module D** (capstone; needs 13 + LSC + integrated embedding + a paired patient).
+6. **Phase 15 Module C** and **Phase 16 validation** last (C is data/acquisition-gated).
+
+---
+
 ## Remaining before a live run (not blockers for stub)
 - Build/push the CopyKAT image (containers/copykat/Dockerfile) and pull cellranger + numbat +
   souporcell images into apptainer.

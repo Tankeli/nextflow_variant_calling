@@ -1,0 +1,5 @@
+sample,patient,timepoint,matrix
+Sample_2395,Patient_1,Dx,/mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling/results_patients/cellranger/Sample_2395/outs/filtered_feature_bc_matrix
+Sample_3001,Patient_1,Rel,/mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling/results_patients/cellranger/Sample_3001/outs/filtered_feature_bc_matrix
+Sample_2977,Patient_2,Dx,/mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling/results_patients/cellranger/Sample_2977/outs/filtered_feature_bc_matrix
+Sample_0109,Patient_2,Rel,/mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling/results_patients/cellranger/Sample_0109/outs/filtered_feature_bc_matrix

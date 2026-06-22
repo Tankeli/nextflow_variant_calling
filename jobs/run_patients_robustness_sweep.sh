@@ -12,7 +12,7 @@
 # Standalone CopyKAT robustness sweep for the 2 DDE_32 prototype patients (4 samples, Dx+Rel).
 # One array task per (sample × combo) from jobs/patients_sweep_manifest.tsv. Runs copykat_sweep.R
 # DIRECTLY on the published CellRanger matrices — does NOT use Nextflow, so it neither locks the
-# active work_patients run nor overwrites the production CopyKAT calls in results_patients/copykat/.
+# active work_patients run nor overwrites the production CopyKAT calls in results_patients/callers/copykat/.
 # Short walltime (6h) so tasks backfill before maintenance YOR796 (2026-06-11 09:00).
 set -euo pipefail
 PROJECT=/mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling
@@ -26,7 +26,7 @@ read -r SAMPLE COMBO KS WIN NG DIST SEED < <(sed -n "${SLURM_ARRAY_TASK_ID}p" "$
 [ -n "${SAMPLE:-}" ] || { echo "no manifest line ${SLURM_ARRAY_TASK_ID}"; exit 1; }
 
 MTX="${PROJECT}/results_patients/cellranger/${SAMPLE}/outs/filtered_feature_bc_matrix"
-OUT="${PROJECT}/results_patients/copykat_robustness/${SAMPLE}/sweep/${COMBO}"
+OUT="${PROJECT}/results_patients/robustness/${SAMPLE}/sweep/${COMBO}"
 mkdir -p "${OUT}"; cd "${OUT}"
 
 echo "[$(date)] ${SAMPLE} ${COMBO} (ncores=${SLURM_CPUS_PER_TASK})"

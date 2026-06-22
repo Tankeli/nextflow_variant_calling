@@ -1,7 +1,8 @@
-// RNA QC (notebook 01): QC metrics + MAD outlier filtering + scDblFinder doublet scoring +
-// gene filtering. Reads the Cell Ranger filtered_feature_bc_matrix/ directory emitted by this
-// pipeline's CELLRANGER (rna_qc.py also accepts a combined filtered .h5). SoupX is skipped:
-// `cellranger multi` does not emit a per-sample raw matrix here. Checkpoint: rna_01_quality_control.h5ad.
+// RNA QC (notebook 01): QC metrics + MAD outlier filtering + optional SoupX ambient correction +
+// scDblFinder doublet scoring + gene filtering. Reads the Cell Ranger filtered_feature_bc_matrix/
+// directory emitted by this pipeline's CELLRANGER (rna_qc.py also accepts a combined filtered .h5).
+// SoupX (params.run_soupx) additionally consumes the per-sample raw matrix (CELLRANGER.out.raw);
+// it is skipped when no raw matrix is wired in. Checkpoint: rna_01_quality_control.h5ad.
 
 process RNA_QC {
     tag "$meta.id"
@@ -10,7 +11,7 @@ process RNA_QC {
     container params.rna_preprocessing_container
 
     input:
-    tuple val(meta), path(matrix_dir)
+    tuple val(meta), path(matrix_dir), path(raw_h5)   // raw_h5 = [] when SoupX is off
 
     output:
     tuple val(meta), path("rna_01_quality_control.h5ad"), emit: h5ad
@@ -19,16 +20,18 @@ process RNA_QC {
 
     script:
     def scdbl   = params.run_scdblfinder ? "--scdblfinder" : ""
+    def raw_arg = raw_h5 ? "--raw_h5 ${raw_h5}" : ""
+    def soupx   = (params.run_soupx && raw_h5) ? "--soupx" : ""
     """
     rna_qc.py \\
-        --filtered_h5 ${matrix_dir} \\
+        --filtered_h5 ${matrix_dir} ${raw_arg} \\
         --sample ${meta.id} \\
         --patient ${meta.patient ?: 'NA'} --timepoint ${meta.timepoint ?: 'NA'} --batch ${meta.batch ?: 'NA'} \\
         --nmads_counts ${params.rna_qc_nmads_counts} \\
         --nmads_mt ${params.rna_qc_nmads_mt} \\
         --max_mito_pct ${params.rna_qc_max_mito_pct} \\
         --min_cells ${params.rna_qc_min_cells} \\
-        ${scdbl} \\
+        ${scdbl} ${soupx} \\
         --out rna_01_quality_control.h5ad \\
         --metrics ${meta.id}_qc_metrics.csv
 

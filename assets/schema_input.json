@@ -47,6 +47,12 @@
                 "enum": ["Dx", "Rel"],
                 "errorMessage": "timepoint must be 'Dx' (diagnosis) or 'Rel' (relapse)",
                 "meta": ["timepoint"]
+            },
+            "batch": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "batch (optional) must not contain spaces",
+                "meta": ["batch"]
             }
         },
         "required": ["sample", "fastq_1", "fastq_2", "feature_type", "patient", "timepoint"]

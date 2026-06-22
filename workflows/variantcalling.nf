@@ -12,14 +12,8 @@ include { COPYKAT_ROBUSTNESS_WF } from '../subworkflows/local/copykat_robustness
 include { SOUPORCELL_WF } from '../subworkflows/local/souporcell'
 include { CLONETRACER_WF } from '../subworkflows/local/clonetracer'
 include { ANNOTATION    } from '../subworkflows/local/annotation'
-include { RNA_CORE        } from '../subworkflows/local/rna_core'
-include { RNA_INTEGRATION } from '../subworkflows/local/rna_integration'
-include { RNA_ADVANCED    } from '../subworkflows/local/rna_advanced'
-include { PROTEIN         } from '../subworkflows/local/protein'
-include { PLOT_COPYKAT    } from '../modules/local/plot_copykat'
-include { PLOT_SOUPORCELL } from '../modules/local/plot_souporcell'
-include { PLOT_CLONETRACER } from '../modules/local/plot_clonetracer'
-include { COHORT_SUMMARY  } from '../modules/local/cohort_summary'
+include { RNA_DOWNSTREAM  } from '../subworkflows/local/rna_downstream'
+include { VISUALIZATION   } from '../subworkflows/local/visualization'
 include { INTEGRATION     } from '../subworkflows/local/integration'
 
 workflow VARIANTCALLING {
@@ -106,6 +100,9 @@ workflow VARIANTCALLING {
     ch_celltypes = Channel.empty()
     ch_mapped = Channel.empty()
     if (params.run_qc || params.run_reference_mapping) {
+        if (params.run_reference_mapping && !params.refmap_atlas) {
+            error "run_reference_mapping requires refmap_atlas (path to the reference atlas .h5ad); set it in your -params-file"
+        }
         def atlas = params.run_reference_mapping ? file(params.refmap_atlas, checkIfExists: true) : []
         def refumap = (params.run_reference_mapping && params.refmap_umap) ? file(params.refmap_umap, checkIfExists: true) : []
         ANNOTATION( ch_aln, params.run_reference_mapping, atlas, refumap )
@@ -117,66 +114,13 @@ workflow VARIANTCALLING {
 
     //
     // RNA downstream best-practices stack (ported from DDE_27), parallel to the callers and to
-    // the lightweight ANNOTATION branch. Runs off the Cell Ranger filtered matrices:
-    //   RNA_CORE        QC -> normalize -> feature-select -> dimred -> cluster -> annotate (per sample)
-    //   RNA_INTEGRATION cohort integration (scVI / scANVI / BBKNN + scib)            [needs run_rna_core]
-    //   RNA_ADVANCED    pseudotime / velocity / DE / composition (gated individually)[needs run_rna_core]
-    //   PROTEIN         surface-protein / ADT branch (CITE-seq only)
-    // All default OFF; enable per run. None of these gate the variant callers.
+    // the lightweight ANNOTATION branch. Runs off the Cell Ranger filtered matrices; all stages
+    // gated by params (default OFF) inside the subworkflow. None of these gate the callers.
+    // The same subworkflow backs the standalone DOWNSTREAM entry (main.nf) off published matrices.
     //
     ch_rna_mtx = ch_aln.map { meta, bam, bai, mtx -> tuple( meta, mtx ) }
-
-    ch_rna_annotated = Channel.empty()
-    if (params.run_rna_core) {
-        RNA_CORE( ch_rna_mtx )
-        ch_rna_annotated = RNA_CORE.out.annotated
-        ch_versions      = ch_versions.mix(RNA_CORE.out.versions)
-    }
-
-    ch_rna_integrated = Channel.empty()
-    if (params.run_rna_integration) {
-        if (!params.run_rna_core) {
-            error "run_rna_integration requires run_rna_core (it consumes the annotated objects)"
-        }
-        RNA_INTEGRATION( ch_rna_annotated )
-        ch_rna_integrated = RNA_INTEGRATION.out.integrated
-        ch_versions       = ch_versions.mix(RNA_INTEGRATION.out.versions)
-    }
-
-    if (params.run_pseudotime || params.run_velocity || params.run_de || params.run_composition) {
-        if (!params.run_rna_core) {
-            error "RNA advanced stages (pseudotime/velocity/de/composition) require run_rna_core"
-        }
-        if (params.run_composition && !params.run_rna_integration) {
-            error "run_composition requires run_rna_integration (it operates on the integrated object)"
-        }
-        // Velocity looms (optional): ${params.velocity_loom_dir}/<sample>.loom; samples without
-        // one are dropped by the join in RNA_ADVANCED.
-        ch_loom = Channel.empty()
-        if (params.run_velocity) {
-            if (!params.velocity_loom_dir) {
-                error "run_velocity requires velocity_loom_dir (this pipeline does not generate velocyto looms)"
-            }
-            ch_loom = ch_rna_mtx
-                .map { meta, mtx -> tuple( meta.id, file("${params.velocity_loom_dir}/${meta.id}.loom") ) }
-                .filter { id, loom -> loom.exists() }
-        }
-        RNA_ADVANCED(
-            ch_rna_annotated,
-            ch_loom,
-            ch_rna_integrated,
-            params.run_pseudotime,
-            params.run_velocity,
-            params.run_de,
-            params.run_composition
-        )
-        ch_versions = ch_versions.mix(RNA_ADVANCED.out.versions)
-    }
-
-    if (params.run_protein) {
-        PROTEIN( ch_rna_mtx )
-        ch_versions = ch_versions.mix(PROTEIN.out.versions)
-    }
+    RNA_DOWNSTREAM( ch_rna_mtx, CELLRANGER.out.raw )
+    ch_versions = ch_versions.mix(RNA_DOWNSTREAM.out.versions)
 
     //
     // CopyKAT robustness sweep (separate analysis track; standalone Python runs downstream over the
@@ -196,52 +140,11 @@ workflow VARIANTCALLING {
     }
 
     //
-    // Visualisation — diagnostic figures over the published checkpoints. Each reads an
-    // existing output in the relevant container; the reference-space overlays need the
-    // mapped h5ads, so they are gated on run_reference_mapping.
+    // Visualisation + cohort reporting — diagnostic figures over the published checkpoints plus the
+    // cohort QC summary. Join keys + per-stage gating live in the VISUALIZATION subworkflow.
     //
-    if (params.run_reference_mapping && params.run_copykat) {
-        // Per-sample CopyKAT call overlaid on the reference-map UMAP (join by sample id).
-        ch_ck_plot = ch_mapped
-            .map { meta, h5ad -> tuple( meta.id, meta, h5ad ) }
-            .join( ch_copykat.map { meta, pred -> tuple( meta.id, pred ) } )
-            .map { id, meta, h5ad, pred -> tuple( meta, h5ad, pred ) }
-        PLOT_COPYKAT( ch_ck_plot )
-        ch_versions = ch_versions.mix(PLOT_COPYKAT.out.versions)
-    }
-
-    if (params.run_reference_mapping && params.run_souporcell) {
-        // Per-patient souporcell clones on a joint reference-space UMAP (Dx/Rel or standalone).
-        ch_mapped_by_patient = ch_mapped
-            .map { meta, h5ad -> tuple( meta.patient, h5ad ) }
-            .groupTuple()
-        ch_soup_plot = SOUPORCELL_WF.out.clusters
-            .filter { meta, k, dir -> k == params.souporcell_plot_k }
-            .map { meta, k, dir -> tuple( meta.id, meta, k, dir ) }
-            .join( ch_mapped_by_patient )
-            .map { pid, meta, k, dir, h5ads -> tuple( meta, k, dir, h5ads ) }
-        PLOT_SOUPORCELL( ch_soup_plot )
-        ch_versions = ch_versions.mix(PLOT_SOUPORCELL.out.versions)
-    }
-
-    if (params.run_reference_mapping && params.run_clonetracer) {
-        // Per-patient CloneTracer clones + posterior confidence on the joint reference-space UMAP.
-        ch_ct_mapped_by_patient = ch_mapped
-            .map { meta, h5ad -> tuple( meta.patient, h5ad ) }
-            .groupTuple()
-        ch_ct_plot = ch_clonetracer
-            .map { meta, csv -> tuple( meta.id, meta, csv ) }
-            .join( ch_ct_mapped_by_patient )
-            .map { pid, meta, csv, h5ads -> tuple( meta, csv, h5ads ) }
-        PLOT_CLONETRACER( ch_ct_plot )
-        ch_versions = ch_versions.mix(PLOT_CLONETRACER.out.versions)
-    }
-
-    if (params.run_qc || params.run_reference_mapping) {
-        // Cohort-level QC summary across all samples.
-        COHORT_SUMMARY( ch_qc.collect() )
-        ch_versions = ch_versions.mix(COHORT_SUMMARY.out.versions)
-    }
+    VISUALIZATION( ch_mapped, ch_copykat, ch_souporcell, ch_clonetracer, ch_qc )
+    ch_versions = ch_versions.mix(VISUALIZATION.out.versions)
 
     //
     // Integration (Phase 2): per-patient master table + headline clonal-tracing Sankeys.

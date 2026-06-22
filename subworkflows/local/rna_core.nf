@@ -14,12 +14,12 @@ include { RNA_ANNOTATE       } from '../../modules/local/rna_annotate'
 
 workflow RNA_CORE {
     take:
-    ch_mtx       // [ meta, filtered_feature_bc_matrix ] (Cell Ranger output)
+    ch_qc_in     // [ meta, filtered_feature_bc_matrix, raw_h5|[] ] (Cell Ranger output; raw for SoupX)
 
     main:
     ch_versions = Channel.empty()
 
-    RNA_QC( ch_mtx )
+    RNA_QC( ch_qc_in )
     ch_versions = ch_versions.mix(RNA_QC.out.versions)
 
     RNA_NORMALIZE( RNA_QC.out.h5ad )

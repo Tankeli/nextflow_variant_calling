@@ -11,13 +11,13 @@
 # Downstream CopyKAT robustness analysis (the standalone half of the hybrid track).
 # Runs AFTER the COPYKAT_ROBUSTNESS sweep has published its combos. Operates on already-published
 # checkpoints only, so it is cheap to re-run / iterate:
-#   - stability + boundary  <- the sweep combos      (results_*/copykat_robustness/<s>/sweep)
+#   - stability + boundary  <- the sweep combos      (results_*/robustness/<s>/sweep)
 #   - drivers / crossref / celltype  <- the production CopyKAT call + reference mapping + atlas
 #
 # Usage: sbatch jobs/run_copykat_robustness.sh [RESULTS_DIR] [ATLAS_H5AD] [SAMPLE ...]
 #   RESULTS_DIR  default results_controls
 #   ATLAS_H5AD   default = atlas from params-controls.yaml
-#   SAMPLE ...   default = every sample dir under <RESULTS_DIR>/copykat
+#   SAMPLE ...   default = every sample dir under <RESULTS_DIR>/callers/copykat
 set -euo pipefail
 PROJECT=/mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling
 cd "${PROJECT}"
@@ -35,21 +35,21 @@ shift || true; shift || true
 MARKER_METHOD="${CKROB_MARKER_METHOD:-wilcoxon}"
 
 if [ "$#" -gt 0 ]; then SAMPLES=("$@"); else
-    mapfile -t SAMPLES < <(ls -1 "${RESULTS}/copykat" 2>/dev/null | grep -v '^figures$' || true)
+    mapfile -t SAMPLES < <(ls -1 "${RESULTS}/callers/copykat" 2>/dev/null | grep -v '^figures$' || true)
 fi
-[ "${#SAMPLES[@]}" -gt 0 ] || { echo "No samples found under ${RESULTS}/copykat"; exit 1; }
+[ "${#SAMPLES[@]}" -gt 0 ] || { echo "No samples found under ${RESULTS}/callers/copykat"; exit 1; }
 
-OUT="${RESULTS}/copykat_robustness/_analysis"
+OUT="${RESULTS}/robustness/_analysis"
 mkdir -p "${OUT}"; cd "${OUT}"
-RES="../../.."   # back to project root from results_*/copykat_robustness/_analysis
+RES="../../.."   # back to project root from results_*/robustness/_analysis
 
 echo "CopyKAT robustness analysis — results=${RESULTS} atlas=${ATLAS} samples=${SAMPLES[*]}"
 
 for S in "${SAMPLES[@]}"; do
     echo "=== ${S} ==="
-    CK="${RES}/${RESULTS}/copykat/${S}"
-    SWEEP="${RES}/${RESULTS}/copykat_robustness/${S}/sweep"
-    MAPPED="${RES}/${RESULTS}/reference_mapping/${S}/${S}_mapped.h5ad"
+    CK="${RES}/${RESULTS}/callers/copykat/${S}"
+    SWEEP="${RES}/${RESULTS}/robustness/${S}/sweep"
+    MAPPED="${RES}/${RESULTS}/annotation/reference_mapping/${S}/${S}_mapped.h5ad"
     CNA="${CK}/${S}_copykat_CNA_results.txt"
     GBC="${CK}/${S}_copykat_CNA_raw_results_gene_by_cell.txt"
     PRED="${CK}/${S}_copykat_prediction.txt"
@@ -76,4 +76,4 @@ for S in "${SAMPLES[@]}"; do
     fi
 done
 
-echo "Done — outputs in ${RESULTS}/copykat_robustness/_analysis"
+echo "Done — outputs in ${RESULTS}/robustness/_analysis"

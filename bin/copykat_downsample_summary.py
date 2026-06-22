@@ -9,7 +9,7 @@ differences are NOT a cell-count artefact.
 
 Usage: copykat_downsample_summary.py <ds_analysis_dir> <full_analysis_dir> <out_prefix> \
                                      <sample:fullN> [<sample:fullN> ...]
-  e.g. ... results_controls/.../downsample/_analysis results_controls/copykat_robustness/_analysis \
+  e.g. ... results_controls/.../downsample/_analysis results_controls/robustness/_analysis \
            results_controls/.../downsample/_analysis/downsample PBM_2:7302 PBM_1:6248 PBMMC_3:5548
 Reads <ds_analysis>/<sample>_frac<f>_copykat_{ari,stability,seed_switch}.csv and
       <full_analysis>/<sample>_copykat_{ari,stability,seed_switch}.csv.

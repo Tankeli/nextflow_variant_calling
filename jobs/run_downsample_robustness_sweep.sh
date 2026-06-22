@@ -12,7 +12,7 @@
 # CopyKAT cell-number confounder test: is the per-sample ARI difference driven by N?
 # For 3 high-cell healthy controls (PBM_2, PBM_1, PBMMC_3) downsampled to 75/50/25% of cells
 # (fixed subset per fraction), re-run the SAME 20-combo grid (KS.cut × seed) so ARI at each N is
-# directly comparable to the full-N (100%) sweep already in results_controls/copykat_robustness/.
+# directly comparable to the full-N (100%) sweep already in results_controls/robustness/.
 # Standalone (no Nextflow); short 4h walltime (downsampled = faster) to clear maintenance YOR796.
 set -euo pipefail
 PROJECT=/mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling
@@ -25,7 +25,7 @@ MANIFEST=jobs/patients_downsample_sweep_manifest.tsv
 read -r SAMPLE FRAC COMBO KS WIN NG DIST SEED < <(sed -n "${SLURM_ARRAY_TASK_ID}p" "$MANIFEST")
 [ -n "${SAMPLE:-}" ] || { echo "no manifest line ${SLURM_ARRAY_TASK_ID}"; exit 1; }
 
-BASE="${PROJECT}/results_controls/copykat_robustness_downsample/${SAMPLE}/frac${FRAC}"
+BASE="${PROJECT}/results_controls/robustness_downsample/${SAMPLE}/frac${FRAC}"
 MTX="${BASE}/matrix"
 OUT="${BASE}/sweep/${COMBO}"
 mkdir -p "${OUT}"; cd "${OUT}"

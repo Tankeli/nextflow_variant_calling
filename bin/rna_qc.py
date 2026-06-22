@@ -87,8 +87,16 @@ def run_soupx(adata, raw_h5):
     genes = adata.var_names
     data = adata.X.T
 
-    adata_raw = sc.read_10x_h5(filename=raw_h5)
+    # raw_h5 may be a 10x mtx directory or an .h5 (see read note in main()).
+    if os.path.isdir(raw_h5):
+        adata_raw = sc.read_10x_mtx(raw_h5, gex_only=False)
+    else:
+        adata_raw = sc.read_10x_h5(filename=raw_h5)
     adata_raw.var_names_make_unique()
+    # The table of droplets must share the (GEX-only) gene set of the filtered counts, else
+    # SoupChannel sees a row mismatch. Drop Antibody Capture rows from the raw CITE-seq matrix.
+    if "feature_types" in adata_raw.var.columns:
+        adata_raw = adata_raw[:, adata_raw.var["feature_types"] == "Gene Expression"].copy()
     data_tod = adata_raw.X.T
     del adata_raw
 
@@ -135,8 +143,13 @@ def run_scdblfinder(adata):
         list(score=sce$scDblFinder.score, class=as.character(sce$scDblFinder.class))
         """
     )
-    adata.obs["scDblFinder_score"] = np.asarray(res.rx2("score"))
-    adata.obs["scDblFinder_class"] = list(res.rx2("class"))
+    # With anndata2ri's global conversion active, the R named list returns as an rpy2 OrdDict
+    # (not a ListVector), so .rx2() is unavailable — index by key. Stay tolerant of both.
+    def _get(r, key):
+        return r.rx2(key) if hasattr(r, "rx2") else r[key]
+
+    adata.obs["scDblFinder_score"] = np.asarray(_get(res, "score"))
+    adata.obs["scDblFinder_class"] = list(_get(res, "class"))
     return adata
 
 

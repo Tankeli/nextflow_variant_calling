@@ -15,7 +15,11 @@ test_clonetracer_gpu/
 # SLURM / orchestrator scratch
 gpu_smoke_*
 *.jobid
+*_jobid           # e.g. .controls_all9_jobid (no dot before 'jobid')
 slurm-*.out
+
+# Derived lab-book exports (the source of truth is docs/lab_book/; never commit the build)
+build_obsidian/
 
 # Stray plugin report defaults (in case a config path is ever misconfigured)
 co2footprint_report_*.html
