@@ -1,0 +1,11 @@
+sample,group,status,n_cells,n_clones,frac_aneuploid,n_cnv_segs,llr_max,llr_median,cnv_span_mb,cnv_states,erythroid_frac,top_aneu_celltype
+PBMMC_2,healthy,called,5077,8,0.452,8,27.3,8.1,1093.1,"bamp,del",0.144,Memory CD4 T cell
+PBMMC_3,healthy,called,5546,3,0.189,2,911.8,462.7,97.5,"bamp,del",0.013,PreB cell
+PBM_2,healthy,called,7295,2,0.195,1,4.6,4.6,15.2,amp,0.072,Common lymphoid progenitor
+HD_BM_1,healthy,silent,0,0,0.0,0,,,,,,
+HD_BM_2,healthy,silent,0,0,0.0,0,,,,,,
+HD_BM_3,healthy,silent,0,0,0.0,0,,,,,,
+HD_BM_4,healthy,silent,0,0,0.0,0,,,,,,
+PBMMC_1,healthy,silent,0,0,0.0,0,,,,,,
+PBM_1,healthy,silent,0,0,0.0,0,,,,,,
+Patient_2,tumour,called,5809,2,0.374,2,1098.9,558.4,15.8,"del,loh",,

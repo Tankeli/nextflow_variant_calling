@@ -76,7 +76,7 @@ Each stage is resumable with a stable output contract under `results/`:
    `nf-core/scrnaseq` as a sub-pipeline.
 2. **NUMBAT** → `NUMBAT_PILEUP` (per-sample and joint-per-patient `pileup_and_phase.R`) →
    `*_allele_counts.tsv.gz`; then `NUMBAT_RUN` (`run_numbat()`, relaxed thresholds
-   `max_entropy=0.8`, `min_LLR=3`) → `results/callers/numbat/<patient>/numbat_out/`.
+   `max_entropy=0.8`, `min_LLR=5`) → `results/callers/numbat/<patient>/numbat_out/`.
 3. **COPYKAT** (per-sample) → `results/callers/copykat/<sample>/*_copykat_prediction.txt`.
 4. **SOUPORCELL** (optional noNK barcode subset → per-patient CB-retag + merge + sort →
    `souporcell_pipeline.py` over a K sweep) → `results/callers/souporcell/<patient>/k<K>/clusters.tsv`.
@@ -227,8 +227,14 @@ the sanctioned login-node exception alongside longship staging.
 
 - Always pool Dx + Rel into one call for Numbat-joint and souporcell-paired; never compare
   per-sample clone IDs across timepoints.
-- Numbat per-sample clone-calling fails at default thresholds (`max_entropy=0.5`, `min_LLR=5`) for
-  most of this cohort; the joint run uses relaxed `0.8` / `3`.
+- Numbat per-sample clone-calling fails at stock defaults (`max_entropy=0.5`, `min_LLR=5`) for most of
+  this cohort; the joint run keeps `max_entropy=0.8` but uses `min_LLR=5` — the seed × min_LLR sweep
+  (lab-book analysis 04) showed `min_LLR=3` retains low-LLR seed-noise (e.g. PBM_2 LLR 4.6) while `5`
+  drops it and keeps every real joint clone; pair with a seed-ARI gate (≥3 seeds) for full robustness.
+- `NUMBAT_RUN` (`run_numbat()`) is memory-heavy: peak RAM scales with cells **and** ncores (forked
+  workers), so joint tree-building runs need ~100–130 G and large paired joints (~15k cells) ~400 G —
+  far above a default ~32 G. `conf/viking.config` gives `NUMBAT_RUN` a 200 G×attempt floor at 8 cores
+  (fewer forks → lower peak). This is likely why Patient_1's `NUMBAT_RUN` never finished originally.
 - Souporcell paired runs were on noNK-filtered BAMs (~50% of cells, the NK-lineage normals, have no
   call) — expected and fine for malignant clonal tracing.
 - Barcode files must be plain text for cellsnp-lite / mgatk-style tools; Cell Ranger ships them

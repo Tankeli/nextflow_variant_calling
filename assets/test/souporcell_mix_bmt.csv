@@ -1,0 +1,7 @@
+sample,patient,timepoint,outs
+Sample_1386,AML066_rel_solo,Rel,results_patients_dde22/cellranger/Sample_1386/outs
+Sample_3652,AML066_dxrel,Dx,results_patients_dde22/cellranger/Sample_3652/outs
+Sample_1386,AML066_dxrel,Rel,results_patients_dde22/cellranger/Sample_1386/outs
+Sample_1187,AML163_dx_solo,Dx,results_patients_dde22/cellranger/Sample_1187/outs
+Sample_1255,AML079_rel_solo,Rel,results_patients_dde22/cellranger/Sample_1255/outs
+Sample_1894,AML107_rel_solo,Rel,results_patients_dde22/cellranger/Sample_1894/outs

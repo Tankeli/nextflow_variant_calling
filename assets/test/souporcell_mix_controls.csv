@@ -1,0 +1,10 @@
+sample,patient,timepoint,outs
+PBMMC_2,MIX_within_PBMMC23,Dx,results_controls/cellranger/PBMMC_2/outs
+PBMMC_3,MIX_within_PBMMC23,Rel,results_controls/cellranger/PBMMC_3/outs
+HD_BM_1,MIX_within_HDBM12,Dx,results_controls/cellranger/HD_BM_1/outs
+HD_BM_2,MIX_within_HDBM12,Rel,results_controls/cellranger/HD_BM_2/outs
+PBMMC_2,MIX_cross_PBMMC2_HDBM3,Dx,results_controls/cellranger/PBMMC_2/outs
+HD_BM_3,MIX_cross_PBMMC2_HDBM3,Rel,results_controls/cellranger/HD_BM_3/outs
+PBMMC_3,MIX_cross_PBMMC3_PBM1,Dx,results_controls/cellranger/PBMMC_3/outs
+PBM_1,MIX_cross_PBMMC3_PBM1,Rel,results_controls/cellranger/PBM_1/outs
+PBMMC_1,MIX_solo_PBMMC1,Dx,results_controls/cellranger/PBMMC_1/outs

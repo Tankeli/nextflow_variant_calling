@@ -1,0 +1,22 @@
+# Conda env for the bulk-proteomics Python stages (PROT_MS_* except PROT_MS_DESP).
+# Create on the Viking login node:  conda env create -f envs/proteomics.yml -n aml_proteomics
+name: aml_proteomics
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - pandas
+  - numpy
+  - scipy
+  - scikit-learn
+  - seaborn
+  - matplotlib
+  - pyyaml
+  - scanpy
+  - anndata
+  - leidenalg
+  - igraph
+  - pip
+  - pip:
+      - inmoose        # pyComBat batch correction (ComBat path in prot_ms_batch.py)

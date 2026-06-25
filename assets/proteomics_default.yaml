@@ -1,0 +1,97 @@
+# Default parameters for the bulk-proteomics branch (PROTEOMICS subworkflow).
+# Ported from DDE_31 config/default.yaml. Path/output routing was dropped — each Nextflow stage
+# takes explicit --in/--out args; this file carries only analysis PARAMETERS. Override per run with
+# --proteomics_config <my.yaml> (deep-merged over these defaults).
+
+# Input file column structure
+input:
+  id_column: 1                     # protein-ID column (1-indexed or name)
+  metadata_columns: [1, 2, 3, 4]   # column positions preserved as protein metadata
+
+# Sample design table columns
+sample_design:
+  sample_column: sample
+  batch_column: Batch
+  replicate_column: replicate      # patient id (drives per-patient DE + DESP)
+  condition_column: condition      # Diagnosis / Relapse
+  condition_mapping: {}
+  condition_cleanup_patterns: []
+  condition_order: [Diagnosis, Relapse]
+
+# QC thresholds + imputation
+qc:
+  protein_id_threshold: 2500       # min protein IDs per sample to retain
+  min_presence_per_condition: 0.75 # detected in >= this fraction of samples in any one condition
+  imputation_method: none          # none | perseus | mle | knn | min | zero
+  imputation_params:
+    perseus_downshift: 1.8
+    perseus_width: 0.3
+    knn_k: 10
+    seed: null
+  impute_na: false
+  log2_pseudocount: 1
+  replace_na_in_nonnorm_with_zero: true
+
+# Batch effect correction
+batch_correction:
+  method: both                     # both | limma | combat | none
+  remove_single_batch_conditions: false
+  remove_single_replicate_conditions: false
+  excluded_conditions: []
+  randomize_condition_labels: false
+  randomize_condition_seed: 42
+  random_condition_labels: [Condition 1, Condition 2]
+
+# Visualisation
+visual:
+  condition_colors: {}
+  heatmap_cutree_rows: 6
+  pca_pairs: [[1, 2], [3, 4]]
+
+umap:
+  nfeatures: 2000
+  dims_start: 1
+  dims_end: 10
+  resolution: 0.6
+  resolutions: []
+
+# Differential expression
+de:
+  design_formula: "~ 0 + condition + replicate"
+  exclude_patients: []
+
+# Machine learning
+ml:
+  seed: 42
+  train_fraction: 0.8
+  top_features: 30
+  rf_num_trees: 1000
+  dt_cp: 0.01
+  dt_maxdepth: 10
+
+# Stage 4 detailed analysis
+stage4:
+  logp_threshold: -0.1
+  logfc_threshold: -10
+  hm_cutree_rows: 7
+  pca_top_loadings: 20
+  pseudotime_rsq_threshold: 0.2
+  pseudotime_padj_threshold: 0.005
+  boxplot_proteins: []
+  go_terms: []
+
+# Volcano styling
+volcano:
+  logfc_label_threshold: 0
+  logp_threshold: 1.3
+  max_overlaps: 20
+  up_color: "#00798c"
+  down_color: "#d1495b"
+  ns_color: "grey28"
+
+# DESP cell-state demixing
+desp:
+  bulk_source: limma               # limma | combat | raw  (which matrix feeds DESP)
+  top_n_proteins: 30               # DE-ranked proteins shown in delta/contribution figures
+  top_celltypes: 25
+  per_patient: true                # also run per-patient (replicate) condition-stratified DESP

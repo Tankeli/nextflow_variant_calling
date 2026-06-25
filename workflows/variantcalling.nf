@@ -15,6 +15,7 @@ include { ANNOTATION    } from '../subworkflows/local/annotation'
 include { RNA_DOWNSTREAM  } from '../subworkflows/local/rna_downstream'
 include { VISUALIZATION   } from '../subworkflows/local/visualization'
 include { INTEGRATION     } from '../subworkflows/local/integration'
+include { PROTEOMICS      } from '../subworkflows/local/proteomics'
 
 workflow VARIANTCALLING {
 
@@ -78,7 +79,8 @@ workflow VARIANTCALLING {
     // over CNV (Numbat) + nuclear-SNV (souporcell) + a new per-sample mtDNA pileup, builds the
     // per-patient JSON and runs the Bayesian model -> clone trees + per-cell clone posteriors.
     //
-    ch_clonetracer = Channel.empty()
+    ch_clonetracer       = Channel.empty()
+    ch_clonetracer_trees = Channel.empty()
     if (params.run_clonetracer) {
         // GTF is optional: it only powers the CNV pseudo-counts. If absent, CloneTracer simply
         // builds its JSON from the SNV + mtDNA axes (build script logs the skipped source).
@@ -89,8 +91,9 @@ workflow VARIANTCALLING {
             else { log.warn "clonetracer_gtf not found (${params.clonetracer_gtf}); CloneTracer CNV axis disabled" }
         }
         CLONETRACER_WF( ch_aln, ch_patient_aln, ch_numbat, ch_souporcell, ct_gtf )
-        ch_clonetracer = CLONETRACER_WF.out.assignments
-        ch_versions    = ch_versions.mix(CLONETRACER_WF.out.versions)
+        ch_clonetracer       = CLONETRACER_WF.out.assignments
+        ch_clonetracer_trees = CLONETRACER_WF.out.trees
+        ch_versions          = ch_versions.mix(CLONETRACER_WF.out.versions)
     }
 
     //
@@ -143,7 +146,7 @@ workflow VARIANTCALLING {
     // Visualisation + cohort reporting — diagnostic figures over the published checkpoints plus the
     // cohort QC summary. Join keys + per-stage gating live in the VISUALIZATION subworkflow.
     //
-    VISUALIZATION( ch_mapped, ch_copykat, ch_souporcell, ch_clonetracer, ch_qc )
+    VISUALIZATION( ch_mapped, ch_copykat, ch_souporcell, ch_clonetracer, ch_clonetracer_trees, ch_qc )
     ch_versions = ch_versions.mix(VISUALIZATION.out.versions)
 
     //
@@ -165,6 +168,34 @@ workflow VARIANTCALLING {
         )
         ch_cells    = INTEGRATION.out.cells
         ch_versions = ch_versions.mix(INTEGRATION.out.versions)
+    }
+
+    //
+    // Bulk proteomics branch (DDE_31 port). Starts from a Spectronaut matrix (params), NOT FASTQ, so
+    // it runs parallel to everything else. The DESP demix's cell-type proportions are derived from
+    // this run's scRNA reference-mapping output (Module-C proteogenomic hook) unless an external
+    // proportions TSV is supplied.
+    //
+    if (params.run_proteomics) {
+        if (!params.proteomics_norm || !params.proteomics_design) {
+            error "run_proteomics needs --proteomics_norm and --proteomics_design"
+        }
+        if (params.prot_run_desp && !params.proteomics_proportions && !params.run_reference_mapping) {
+            error "prot_run_desp needs --proteomics_proportions or run_reference_mapping (scRNA proportions)"
+        }
+        def no_file = file("${projectDir}/assets/NO_FILE")
+        ch_prot_inputs = Channel.value( tuple(
+            params.proteomics_nonnorm ? file(params.proteomics_nonnorm, checkIfExists: true) : file(params.proteomics_norm, checkIfExists: true),
+            file(params.proteomics_norm, checkIfExists: true),
+            file(params.proteomics_design, checkIfExists: true),
+            params.proteomics_contaminants ? file(params.proteomics_contaminants, checkIfExists: true) : no_file
+        ) )
+        // scRNA cell-type calls -> proportions (only needed for DESP without an external TSV)
+        ch_prot_celltypes = (params.prot_run_desp && !params.proteomics_proportions)
+            ? ch_celltypes.map { meta, csv -> csv }.collect()
+            : Channel.empty()
+        PROTEOMICS( ch_prot_inputs, ch_prot_celltypes )
+        ch_versions = ch_versions.mix(PROTEOMICS.out.versions)
     }
 
     emit:

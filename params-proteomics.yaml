@@ -1,0 +1,29 @@
+# Real-run params for the bulk-proteomics branch (F157). Use with the standalone entry:
+#   nextflow run . -entry PROTEOMICS -profile viking -params-file params-proteomics.yaml -work-dir work --outdir results_proteomics
+# or enable it inside the main pipeline by adding `run_proteomics: true` to a main -params-file
+# (proportions then auto-derive from the scRNA reference-mapping run; no celltypes glob/map needed).
+
+# ── Inputs (DDE_31 F157 Spectronaut search output) ──
+proteomics_norm:    /mnt/scratch/users/hbp534/DDE_31_paediatric_proteomics/original_data/F157_Norm_Report_FP-A_In.tsv
+proteomics_nonnorm: /mnt/scratch/users/hbp534/DDE_31_paediatric_proteomics/original_data/F157_NonNorm_Report_FP-A_In.tsv
+proteomics_design:  /mnt/scratch/users/hbp534/DDE_31_paediatric_proteomics/original_data/F157_EA.txt
+proteomics_contaminants: /mnt/scratch/users/hbp534/DDE_31_paediatric_proteomics/reference/contaminants.txt
+proteomics_config:  assets/proteomics_f157.yaml      # patient-batch limma, id_column Protein.Ids, etc.
+
+# ── Stage toggles ──
+prot_run_de: true
+prot_run_viz: true
+prot_run_stage4: true
+prot_run_ml: true
+prot_run_desp: true
+prot_batch_method: none                               # single batch — no correction (matches the f157 config)
+prot_desp_bulk_source: raw                            # method=none writes matrix_raw (not matrix_limma)
+
+# ── DESP cell-type proportions ──
+# This run uses the pre-computed DDE_31 transcriptomics-overlap proportions (itself scRNA-derived),
+# so DESP runs now without waiting on AML-patient reference-mapping. Verified end-to-end.
+proteomics_proportions: /mnt/scratch/users/hbp534/DDE_31_paediatric_proteomics/results/desp_inputs/f157_celltype_proportions_overlap.tsv
+# Follow-up — full in-pipeline integration once AML scRNA celltypes are published: drop the line above
+# and either run inside the main pipeline with run_reference_mapping=true (auto proportions), or set
+#   proteomics_celltypes_glob: "results_patients/reference_mapping/*/*_celltypes.csv"
+#   proteomics_sample_map: assets/proteomics_sample_map.tsv

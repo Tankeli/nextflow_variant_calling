@@ -309,6 +309,10 @@ def main():
     ap.add_argument("--max-snvs", type=int, default=50)
     ap.add_argument("--mtdna-min-cells", type=int, default=10)
     ap.add_argument("--mtdna-max-sites", type=int, default=50)
+    ap.add_argument("--max-total-muts", type=int, default=6,
+                    help="hard cap on total mutations fed to the model (priority CNV>SNV>mtDNA). "
+                         "CloneTracer's tree search explodes super-exponentially in mutation count, "
+                         "so keep this small (~3-6); 0 disables the cap.")
     ap.add_argument("--pseudobulk", action="store_true",
                     help="synthesise per-class bulk_M/bulk_N (column sums per timepoint) so the "
                          "multi-sample model (-s) can run without external bulk exome/karyotype data")
@@ -365,6 +369,22 @@ def main():
     if not names:
         log("ERROR: no mutations from any source (CNV/SNV/mtDNA). Cannot build CloneTracer input.")
         sys.exit(2)
+
+    # ---- hard total-mutation cap (priority CNV > SNV > mtDNA) -------------------------------------
+    # CloneTracer's infer_hierarchy re-fits SVI to every candidate tree and the candidate count grows
+    # super-exponentially with mutation count, so an unbounded set never finishes. Sources are already
+    # best-first within type; a stable sort by mut_type keeps all CNVs, then fills with SNVs, then mtDNA.
+    if args.max_total_muts and len(names) > args.max_total_muts:
+        keep = sorted(range(len(names)), key=lambda i: mut_type[i])[:args.max_total_muts]
+        keep_set = set(keep)
+        dropped = len(names) - len(keep)
+        names    = [names[i]    for i in range(len(names)) if i in keep_set]
+        mut_type = [mut_type[i] for i in range(len(mut_type)) if i in keep_set]
+        r_cnv    = [r_cnv[i]    for i in range(len(r_cnv)) if i in keep_set]
+        M_cols   = [M_cols[i]   for i in range(len(M_cols)) if i in keep_set]
+        N_cols   = [N_cols[i]   for i in range(len(N_cols)) if i in keep_set]
+        log(f"total-cap: kept {len(names)}/{len(names)+dropped} mutations "
+            f"(cap {args.max_total_muts}, priority CNV>SNV>mtDNA): {names}")
 
     # cells x mutations
     M = np.vstack(M_cols).T

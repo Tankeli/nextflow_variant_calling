@@ -4,15 +4,15 @@
 #SBATCH --partition=nodes
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
-#SBATCH --time=00:40:00
+#SBATCH --time=02:00:00
 #SBATCH --output=logs/ct_sub8_%j.log
 #SBATCH --error=logs/ct_sub8_%j.err
 #
-# Diagnosis test: run the CloneTracer model on an 8-mutation subset of the real HD_BM_3 JSON
-# (1645 cells, 4 SNV + 4 mtDNA, no CNVs -> 300 SVI iters). The full 100-mut JSON timed out at 2h
-# because infer_hierarchy does a combinatorial per-mutation tree search; this confirms a small
-# mutation set runs quickly. CPU partition (all a40 GPUs were fully allocated, ~16h queue) using
-# the fast pinned env (pyro 1.8.4 / torch 1.13.1) without -g. Unbuffered so progress is visible.
+# Run the full CloneTracer model on an 8-mutation subset of the real HD_BM_3 JSON (1645 cells,
+# 4 SNV + 4 mtDNA, no CNVs -> 300 SVI iters). Earlier 100-mut/8-mut runs hung at ~2s CPU: that was
+# an OpenMP oversubscription deadlock (OMP_NUM_THREADS unset -> torch spawns ~96 threads onto 4
+# allocated cores). Capping OMP/MKL threads to the allocation fixes it (the stepwise diagnostic with
+# OMP_NUM_THREADS=4 ran clean). CPU partition + fast pinned env (pyro 1.8.4 / torch 1.13.1), no -g.
 set -euo pipefail
 
 PROJ=/mnt/scratch/users/hbp534/DDE_33_nextflow_variant_calling
@@ -24,6 +24,10 @@ source activate clonetracer_gpu
 export PYTHONNOUSERSITE=1
 export PYTHONUNBUFFERED=1
 export PYTHONPATH="${PROJ}/bin:${PYTHONPATH:-}"
+# Match thread pools to the SLURM allocation to avoid the OpenMP oversubscription deadlock.
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-4}
+export MKL_NUM_THREADS=${SLURM_CPUS_PER_TASK:-4}
+export OPENBLAS_NUM_THREADS=${SLURM_CPUS_PER_TASK:-4}
 
 echo "Start $(date)  host=$(hostname)"
 python -c "import torch; print('torch', torch.__version__, 'cuda?', torch.cuda.is_available())"

@@ -343,8 +343,13 @@
                 },
                 "clonetracer_max_snvs": {
                     "type": "integer",
-                    "default": 50,
+                    "default": 6,
                     "description": "Cap on nuclear-SNV sites taken from souporcell."
+                },
+                "clonetracer_max_total_muts": {
+                    "type": "integer",
+                    "default": 6,
+                    "description": "Hard cap on total mutations fed to the model (priority CNV>SNV>mtDNA). CloneTracer's tree search explodes super-exponentially in mutation count; keep small (~3-6). 0 disables."
                 },
                 "clonetracer_mtdna_method": {
                     "type": "string",
@@ -377,8 +382,8 @@
                 },
                 "clonetracer_mtdna_max_sites": {
                     "type": "integer",
-                    "default": 50,
-                    "description": "Cap on mtDNA sites."
+                    "default": 6,
+                    "description": "Cap on mtDNA sites (also bounded by clonetracer_max_total_muts)."
                 },
                 "clonetracer_container": {
                     "type": "string",
@@ -396,6 +401,11 @@
                     "type": "string",
                     "format": "file-path",
                     "description": "CSV (sample,patient,timepoint,matrix) for the standalone DOWNSTREAM entry: runs the RNA stack off already-published Cell Ranger filtered matrices."
+                },
+                "souporcell_samplesheet": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "CSV (sample,patient,timepoint,outs) for the standalone SOUPORCELL_ONLY entry: runs souporcell deconvolution off already-published Cell Ranger outs. Group samples under one patient value to form an artificial multi-individual mix."
                 },
                 "run_rna_core": {
                     "type": "boolean",
@@ -583,6 +593,129 @@
                     "description": "Container for the protein/ADT branch."
                 }
             }
+        },
+        "proteomics_options": {
+            "title": "Bulk proteomics branch (ported from DDE_31)",
+            "type": "object",
+            "description": "Optional bulk mass-spec analysis off a Spectronaut search matrix (NOT FASTQ): QC/prep -> batch correction -> DE/viz/stage4/ML -> DESP cell-state demixing. Runs as a gated branch (run_proteomics) and a standalone -entry PROTEOMICS. DESP proportions are derived from this run's scRNA reference-mapping output or an external TSV. All OFF by default.",
+            "properties": {
+                "run_proteomics": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable the bulk-proteomics branch in the main workflow."
+                },
+                "prot_run_de": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "limma DE + volcano (on the filtered_log2 matrix)."
+                },
+                "prot_run_viz": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Heatmaps / PCA / UMAP visualisation."
+                },
+                "prot_run_stage4": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Stage-4: sig-protein HM/PCA/kmeans/pseudotime/boxplots/offsets. Requires prot_run_de."
+                },
+                "prot_run_ml": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Decision-tree + random-forest condition classifiers."
+                },
+                "prot_run_desp": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "DESP cell-state demixing (R) + viz. Requires proportions + prot_run_de."
+                },
+                "proteomics_norm": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Normalized Spectronaut protein matrix (features x samples)."
+                },
+                "proteomics_nonnorm": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Un-normalized matrix (falls back to proteomics_norm if omitted)."
+                },
+                "proteomics_design": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Design TSV: sample, condition, replicate (=patient), Batch."
+                },
+                "proteomics_contaminants": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Contaminant protein-ID list (one per line)."
+                },
+                "proteomics_config": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Experiment YAML deep-merged over assets/proteomics_default.yaml."
+                },
+                "proteomics_proportions": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "External cell_type x sample proportions TSV for DESP (skips scRNA-derived proportions)."
+                },
+                "proteomics_celltypes_glob": {
+                    "type": "string",
+                    "description": "Glob of <sample>_celltypes.csv to derive DESP proportions (standalone -entry PROTEOMICS)."
+                },
+                "proteomics_sample_map": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "TSV rna_sample<TAB>prot_sample to align scRNA ids to proteomics sample ids."
+                },
+                "prot_batch_method": {
+                    "type": "string",
+                    "default": "both",
+                    "enum": ["none", "limma", "combat", "both"],
+                    "description": "Batch-correction method (must match the config batch_correction.method)."
+                },
+                "prot_desp_bulk_source": {
+                    "type": "string",
+                    "default": "limma",
+                    "enum": ["limma", "combat", "raw"],
+                    "description": "Which corrected matrix feeds DESP/VIZ/STAGE4/ML."
+                },
+                "prot_desp_per_patient": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Also run per-patient (replicate) condition-stratified DESP."
+                },
+                "prot_condition_col": {
+                    "type": "string",
+                    "default": "condition",
+                    "description": "Design condition column."
+                },
+                "prot_replicate_col": {
+                    "type": "string",
+                    "default": "replicate",
+                    "description": "Design replicate (=patient) column."
+                },
+                "prot_id_col": {
+                    "type": "string",
+                    "default": "Protein.Ids",
+                    "description": "Protein-ID column in the bulk matrix (DESP rownames)."
+                },
+                "prot_celltype_col": {
+                    "type": "string",
+                    "default": "ref_cell_type",
+                    "description": "Cell-type column in <sample>_celltypes.csv (REFERENCE_MAPPING output)."
+                },
+                "proteomics_container": {
+                    "type": "string",
+                    "default": "dde31-proteomics:0.1",
+                    "description": "Python container for the proteomics stages (pandas/scipy/sklearn/scanpy/seaborn/inmoose)."
+                },
+                "proteomics_r_container": {
+                    "type": "string",
+                    "default": "dde31-desp:0.1",
+                    "description": "R container carrying the DESP package for the demix step."
+                }
+            }
         }
     },
     "allOf": [
@@ -609,6 +742,9 @@
         },
         {
             "$ref": "#/$defs/rna_downstream_options"
+        },
+        {
+            "$ref": "#/$defs/proteomics_options"
         }
     ]
 }

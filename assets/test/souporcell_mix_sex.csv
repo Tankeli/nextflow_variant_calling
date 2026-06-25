@@ -1,0 +1,5 @@
+sample,patient,timepoint,outs
+Sample_8178,MIX_sex_M8178_F2977,Dx,results_patients_dde22/cellranger/Sample_8178/outs
+Sample_2977,MIX_sex_M8178_F2977,Rel,results_patients/cellranger/Sample_2977/outs
+Sample_2395,MIX_sex_M2395_F2958,Dx,results_patients/cellranger/Sample_2395/outs
+Sample_2958,MIX_sex_M2395_F2958,Rel,results_patients_dde22/cellranger/Sample_2958/outs

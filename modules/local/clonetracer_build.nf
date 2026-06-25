@@ -36,6 +36,7 @@ process CLONETRACER_BUILD {
         --max-snvs ${params.clonetracer_max_snvs} \\
         --mtdna-min-cells ${params.clonetracer_mtdna_min_cells} \\
         --mtdna-max-sites ${params.clonetracer_mtdna_max_sites} \\
+        --max-total-muts ${params.clonetracer_max_total_muts} \\
         --output ${meta.id}.json
 
     cat <<-END_VERSIONS > versions.yml

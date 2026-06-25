@@ -1,6 +1,8 @@
-// Per-patient CloneTracer clone UMAP (Dx/Rel overlay + posterior confidence) + clone x timepoint
-// composition, on the SHARED reference-map space (X_umap_ref from the mapped h5ads). Clones come
-// from CloneTracer's per-cell <patient>_clone_assignments.csv.
+// Per-patient CloneTracer figures. Two complementary sets, both in the aml_scrna env (viking profile):
+//   * clonetracer_figures.py (pickle only): clonal-hierarchy trees, ELBO/model-evidence, and the
+//     single-cell VAF + clone-posterior heatmap — ports of the veltenlab clonal_inference R vignette.
+//   * plot_clonetracer_umap.py (assignments + mapped h5ads): clones + posterior confidence on the
+//     SHARED reference-map UMAP (X_umap_ref) and a clone x timepoint composition.
 
 process PLOT_CLONETRACER {
     tag "$meta.id"
@@ -9,16 +11,20 @@ process PLOT_CLONETRACER {
     container params.scanpy_container
 
     input:
-    tuple val(meta), path(assignments), path(mapped_h5ads)
+    tuple val(meta), path(assignments), path(out_pickle), path(mapped_h5ads)
 
     output:
-    path "${meta.id}_clonetracer_*.{png,pdf}", emit: figures
-    path "versions.yml"                       , emit: versions
+    path "${meta.id}_*.{png,pdf}", emit: figures
+    path "versions.yml"          , emit: versions
 
     script:
     def samples    = meta.samples.join(',')
     def timepoints = meta.timepoints.join(',')
     """
+    # Trees / ELBO / VAF+posterior heatmap from the model pickle.
+    clonetracer_figures.py ${out_pickle} ${meta.id} .
+
+    # Clone overlay + composition on the shared reference-map UMAP.
     plot_clonetracer_umap.py ${meta.id} ${assignments} \\
         ${samples} ${timepoints} ${mapped_h5ads}
 
@@ -30,10 +36,10 @@ process PLOT_CLONETRACER {
 
     stub:
     """
-    echo stub > ${meta.id}_clonetracer_umap.png
-    echo stub > ${meta.id}_clonetracer_umap.pdf
-    echo stub > ${meta.id}_clonetracer_composition.png
-    echo stub > ${meta.id}_clonetracer_composition.pdf
+    for s in trees elbo heatmap clonetracer_umap clonetracer_composition; do
+        echo stub > ${meta.id}_\${s}.png
+        echo stub > ${meta.id}_\${s}.pdf
+    done
     echo '"${task.process}": {scanpy: stub}' > versions.yml
     """
 }

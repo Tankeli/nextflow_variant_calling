@@ -1,0 +1,9 @@
+sample,patient,timepoint,outs
+Sample_2395,MIX_dx_2395_2977,Dx,results_patients/cellranger/Sample_2395/outs
+Sample_2977,MIX_dx_2395_2977,Rel,results_patients/cellranger/Sample_2977/outs
+Sample_2958,MIX_dx_2958_1199,Dx,results_patients_dde22/cellranger/Sample_2958/outs
+Sample_1199,MIX_dx_2958_1199,Rel,results_patients_dde22/cellranger/Sample_1199/outs
+Sample_2395,MIX_dx_3way,Dx,results_patients/cellranger/Sample_2395/outs
+Sample_2977,MIX_dx_3way,Rel,results_patients/cellranger/Sample_2977/outs
+Sample_2958,MIX_dx_3way,Rel,results_patients_dde22/cellranger/Sample_2958/outs
+Sample_2395,MIX_solo_2395,Dx,results_patients/cellranger/Sample_2395/outs

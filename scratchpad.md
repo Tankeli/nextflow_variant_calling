@@ -450,16 +450,66 @@ The capstone. Uses the Dx→Rel pair as a free prospective fate readout.
       (requires `run_rna_integration` + classifier + LSC). GPU note: JAX/OTT — viking GPU partition +
       a scvi/moscot GPU container (cf. [[clonetracer-env-slow]] perf lesson).
 
-### Phase 15 — Module C: proteogenomic anchoring (bulk MS) (plan P6) — TODO (feasibility-gated, lower priority)
-Orthogonal protein-level malignancy anchor from matched **bulk** proteomics. NOTE: the existing
-`prot_*` modules are **CITE-seq ADT**, not bulk MS — this is a new, separate ingest.
-- [ ] Confirm acquisition first (DDA vs DIA + depth) — this gates whether fusion-peptide detection is
-      viable at all (plan risk register). Don't build until confirmed.
-- [ ] Bulk MS ingest (DIA-NN / FragPipe) via an extended sample sheet (`modality=bulk_ms`).
-- [ ] `bin/proteogenomic_anchor.py` — custom search DB augmented with **fusion-junction peptides**
-      (from P10) + known variant peptides → sample-level malignant anchor; bulk↔single-cell
-      consistency constraint (NNLS / BayesPrism-style, caveated).
-- [ ] Gated `run_proteogenomics`; output sample-level anchor + consistency metric (validation use).
+### Phase 15 — Bulk proteomics branch (DDE_31 port; plan P6 Module C) — DONE (wiring + functional, R→Python)
+Ported the DDE_31 `f157` paediatric bulk-proteomics pipeline (Spectronaut DIA, timsTOF) into DDE_33 as
+a gated branch + standalone `-entry PROTEOMICS`. **Full port** (all 23 R scripts), **R→Python** except
+DESP (kept as one R step — the demix is an external package). DESP cell-type proportions are **derived
+from this pipeline's scRNA reference-mapping output** (Module-C proteogenomic hook) or an external TSV.
+Input is a Spectronaut matrix (NOT FASTQ) so the branch runs parallel to everything. NOTE: distinct from
+the existing CITE-seq ADT `prot_*` modules — this is `prot_ms_*`, bulk MS.
+- [x] Shared infra (Python): `bin/prot_ms_utils.py` (config deep-merge + IO + design + imputation +
+      DE filters, port of utils.R/imputation.utils.R), `bin/prot_ms_plotting.py` (matplotlib/seaborn
+      port of plotting.utils.R), `assets/proteomics_default.yaml` (params only; path-routing dropped —
+      each stage takes explicit --in/--out).
+- [x] Stages (Python): `prot_ms_prep.py` (1a), `prot_ms_batch.py` (1b — **limma removeBatchEffect
+      reimplemented** + ComBat via inmoose), `prot_ms_de.py` (3a/3b — **limma lmFit/eBayes reimplemented**
+      incl. squeezeVar/fitFDist/trigammaInverse + volcano + per-patient logFC), `prot_ms_viz.py` (2a/2b,
+      UMAP via scanpy/DPT — Seurat/slingshot not reproduced), `prot_ms_stage4.py` (4a-4f; pseudotime is a
+      DPT+Spearman stand-in, tradeSeq omitted), `prot_ms_ml.py` (5a/5b — sklearn DT + RF impurity
+      importance; perm-importance dropped as impractical over ~6500 features),
+      `prot_ms_proportions.py` (scRNA celltypes → cell_type×sample proportions), `prot_ms_desp_viz.py`
+      (6a/6c/6e figures).
+- [x] DESP demix kept in R: `bin/prot_ms_desp_run.R` (wraps `DESP::DESP`, condition-stratified +
+      per-patient; row-median NA handling from 6d).
+- [x] Nextflow: 9 modules `modules/local/prot_ms_*.nf` + `subworkflows/local/proteomics.nf`
+      (PREP→BATCH spine; DE/VIZ/STAGE4/ML; PROPORTIONS→DESP→DESP_VIZ; gated `prot_run_*`) +
+      `-entry PROTEOMICS` (main.nf) + gated `run_proteomics` (variantcalling.nf, feeds REFERENCE_MAPPING
+      celltypes to proportions). publishDir → `results/proteomics/{01_qc..07_desp}`.
+- [x] Config/schema/containers: `nextflow.config` params (default OFF), `nextflow_schema.json`
+      `proteomics_options`, `conf/viking.config` env hooks (`aml_proteomics` Python / `desp_r`),
+      `conf/modules.config` publishDir, `containers/{proteomics,desp}/Dockerfile`,
+      `envs/{proteomics,desp_r}.yml`, `assets/NO_FILE`, `assets/test/proteomics_*` stub inputs.
+- [x] Validated: `-entry PROTEOMICS -profile test -stub` exit 0 (8 processes; `-ansi-log false` confirms
+      PREP/BATCH/DE/VIZ/STAGE4/ML/DESP/DESP_VIZ). **Functional run on REAL F157 data** (`aml_proteomics`
+      + `desp_r` envs): PREP=6481 proteins×12 samples, BATCH(limma), DE(6481 + per-patient), VIZ, STAGE4,
+      ML(4 s), and the **real DESP** = 6481 features×54 cell types over 6 overlap samples + per-patient
+      AML152 — exactly reproduces DDE_31's dimensions. Bugs fixed en route: R colour `grey28`,
+      ward→average linkage, clustermap recursion (setrecursionlimit + cap rows), numeric-sample-ID
+      reconciliation (matrix `109` vs design `0109`), RF perm→impurity importance.
+
+**Live TODO (before a real run):**
+- [x] Created `aml_proteomics` (envs/proteomics.yml; scanpy 1.11.5 + inmoose pycombat_norm verified) +
+      `desp_r` on the Viking login node. **DESP repo = `AhmedYoussef95/DESP`** (NOT the placeholder);
+      needs GitHub dep `ggsankey` (`remotes::install_github("davidsjoberg/ggsankey")`) installed first.
+- [x] DESP verified end-to-end: `DESP(bulk, proportions, lambda, beta, similarities)` — bulk=features×
+      samples, **proportions=samples×cell-state** (confirmed from source; matches the wrapper's
+      `t(prop_mat)`), output=features×cell-state. `prot_ms_desp_run.R` runs clean on toy data (per-
+      condition + delta + per-patient). FIXED a real bug: numeric sample IDs (`2977`) were read as
+      integers and indexed columns BY POSITION → `colClasses="character"` on the design.
+- [x] Real-run scaffolding written: `params-proteomics.yaml` (points at the F157 Spectronaut inputs +
+      `assets/proteomics_f157.yaml` config), `assets/proteomics_sample_map.tsv` (scRNA `Sample_2395/3001/
+      2977/0109` → proteomics `2395/3001/2977/109`). `prot_batch_method` must match the YAML
+      `batch_correction.method` (both `limma`).
+- [ ] Real DESP-from-scRNA still pending the AML-patient scRNA celltypes: either run the branch inside
+      the main pipeline with `run_reference_mapping=true` (auto proportions) OR point
+      `--proteomics_celltypes_glob` at a published `results_*/reference_mapping/*/*_celltypes.csv`. The
+      external-proportions path is verified end-to-end now.
+
+### Phase 15b — proteogenomic *fusion-peptide* anchoring (plan P6 advanced) — TODO
+The bulk-MS port above is DDE_31 (DE + DESP deconvolution). The plan's *additional* P6 idea — a custom
+search DB with **fusion-junction peptides** (from the Phase-10 fusion branch) + known variant peptides,
+re-searched against raw spectra as a sample-level malignant anchor, plus a bulk↔single-cell consistency
+constraint — is NOT built (needs the fusion branch + raw spectra). Follow-on.
 
 ### Phase 16 — Validation framework (plan P9) — TODO
 - [ ] `subworkflows/local/validation.nf` (gated `run_validation`): cross-patient hold-out for Module D

@@ -1,0 +1,17 @@
+# Conda env for the single R DESP step (PROT_MS_DESP). DESP is not on conda/CRAN — install from
+# GitHub after creating the env. On the Viking login node:
+#   conda env create -f envs/desp_r.yml -n desp_r
+#   conda activate desp_r
+#   Rscript -e 'remotes::install_github("AhmedYoussef95/DESP")'   # Cell Reports Methods 2024 repo
+# DESP solves a per-feature constrained QP (quadprog: Dmat=t(prop)%*%prop, solve.QP); proportions are
+# passed sample-by-cell-state (rows=samples) — matches prot_ms_desp_run.R. Output is feature-by-state.
+name: desp_r
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - r-base=4.3
+  - r-optparse
+  - r-remotes
+  - r-matrix
+  - r-quadprog        # DESP solves a constrained least-squares demix

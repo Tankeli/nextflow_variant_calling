@@ -1,0 +1,39 @@
+# F157 experiment config (deep-merged over assets/proteomics_default.yaml via --proteomics_config).
+# Ported from DDE_31 config/f157.yaml. NO batch correction: the 12 samples are a single batch, so the
+# raw filtered/log2 matrix feeds DE/DESP/downstream (run with prot_desp_bulk_source=raw). To instead
+# reproduce DDE_31's patient-batch limma run, set batch_correction.method=limma + batch_column=replicate
+# + prot_batch_method=limma + prot_desp_bulk_source=limma. Path routing dropped — file paths come from
+# the --proteomics_* params.
+
+input:
+  id_column: Protein.Ids          # 3rd column of the Spectronaut matrix
+
+sample_design:
+  sample_column: sample
+  batch_column: Batch
+  replicate_column: replicate     # patient ID (drives per-patient DE + DESP)
+  condition_column: condition     # Diagnosis / Relapse
+  condition_order: [Diagnosis, Relapse]
+
+# The F157 Spectronaut matrix carries 6 metadata columns (Genes, Protein.Group, Protein.Ids,
+# First.Protein.Description, Peptides, Min*(PG.Q.Value)) before the sample columns. Keep the first
+# four (incl. Protein.Ids + Genes); sample columns are selected by design$sample regardless.
+input_metadata_note: "samples are selected by design$sample; metadata_columns keeps Genes..First.Protein.Description"
+
+batch_correction:
+  method: none                    # single batch — no correction (MUST match --prot_batch_method)
+
+visual:
+  condition_colors:
+    Diagnosis: "#1f77b4"
+    Relapse: "#d62728"
+
+umap:
+  resolutions: [0.3, 0.6, 0.9, 1.2]
+
+stage4:
+  boxplot_proteins: [MTO1, HLA-F, RTN3, CLEC3B, ZBTB43, COMMD2, KRT16, ULK1]
+
+desp:
+  bulk_source: raw
+  per_patient: true

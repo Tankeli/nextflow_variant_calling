@@ -16,6 +16,7 @@ workflow VISUALIZATION {
     ch_copykat      // [ meta, prediction ]             per sample
     ch_souporcell   // [ meta, k, dir ]                 per patient, per K
     ch_clonetracer  // [ meta, assignments.csv ]        per patient
+    ch_ct_trees     // [ meta, out.pickle, tree.pickle ] per patient (CloneTracer model pickles)
     ch_qc           // [ meta, qc_metrics.csv ]         per sample
 
     main:
@@ -49,11 +50,13 @@ workflow VISUALIZATION {
     }
 
     if (params.run_reference_mapping && params.run_clonetracer) {
-        // Per-patient CloneTracer clones + posterior confidence on the joint reference-space UMAP.
+        // Per-patient CloneTracer: trees/ELBO/heatmap from the model pickle + clone overlay on the
+        // joint reference-space UMAP. Join assignments + out.pickle + mapped h5ads by patient id.
         ch_ct_plot = ch_clonetracer
             .map { meta, csv -> tuple( meta.id, meta, csv ) }
+            .join( ch_ct_trees.map { meta, outp, treep -> tuple( meta.id, outp ) } )
             .join( ch_mapped_by_patient )
-            .map { pid, meta, csv, h5ads -> tuple( meta, csv, h5ads ) }
+            .map { pid, meta, csv, outp, h5ads -> tuple( meta, csv, outp, h5ads ) }
         PLOT_CLONETRACER( ch_ct_plot )
         ch_versions = ch_versions.mix(PLOT_CLONETRACER.out.versions)
     }
